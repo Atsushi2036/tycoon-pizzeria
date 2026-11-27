@@ -6,6 +6,7 @@ import { GestorHUD } from './ui/gestor-hud';
 import { GestorPaneles, type TipoEstacion } from './ui/gestor-paneles';
 import { GestorTutorial } from './ui/gestor-tutorial';
 import { GestorDev } from './ui/gestor-dev';
+import { GestorAudio } from './ui/audio';
 import { EscenaPrincipal } from './scenes/escena-principal';
 import { Toast } from './ui/toast';
 import { SAVE_KEY } from './config/game-config';
@@ -19,6 +20,9 @@ class AplicacionJuego {
   private paneles!: GestorPaneles;
   private tutorial!: GestorTutorial;
   private devPanel!: GestorDev;
+  private audio = new GestorAudio();
+  private nivelAnterior = 1;
+  private ventasAudioPrevias = 0;
   private juegoPhaser!: Phaser.Game;
   private escena!: EscenaPrincipal;
   private controladorReproduccion: ControladorReproduccion | null = null;
@@ -44,10 +48,12 @@ class AplicacionJuego {
   }
 
   private iniciarUI(): void {
+    this.nivelAnterior = this.motor.nivel;
     this.hud = new GestorHUD(
       this.motor,
       () => this.manejarBotonPrincipal(),
-      () => this.paneles.abrir('partida')
+      () => this.paneles.abrir('partida'),
+      () => this.audio.alternarSilencio()
     );
 
     this.paneles = new GestorPaneles(
@@ -127,6 +133,7 @@ class AplicacionJuego {
         preciosVenta: precios,
       });
       this.controladorReproduccion = ctrl;
+      this.ventasAudioPrevias = 0;
 
       this.hud.setEnReproduccion(true);
       this.actualizarBarraReproduccion();
@@ -150,6 +157,10 @@ class AplicacionJuego {
   private actualizarBarraReproduccion(): void {
     if (!this.controladorReproduccion) return;
     const ctrl = this.controladorReproduccion;
+    if (ctrl.ventasEnVivo > this.ventasAudioPrevias && !ctrl.terminado) {
+      this.ventasAudioPrevias = ctrl.ventasEnVivo;
+      this.audio.reproducirVenta();
+    }
     this.devPanel.render();
     this.hud.renderReproduccion(ctrl, {
       alAlternarPausa: () => {
@@ -188,6 +199,15 @@ class AplicacionJuego {
   }
 
   private actualizarTodo(animar = true): void {
+    if (animar) {
+      if (this.motor.nivel > this.nivelAnterior) {
+        this.audio.reproducirSubirNivel();
+      } else if (this.motor.fase === 'preparar') {
+        this.audio.reproducirCompra();
+      }
+    }
+    this.nivelAnterior = this.motor.nivel;
+
     this.motor.evaluarProgresoTutorial();
     this.hud.render();
     this.sincronizarEscenaConNucleo(animar);

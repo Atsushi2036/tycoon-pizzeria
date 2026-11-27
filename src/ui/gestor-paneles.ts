@@ -107,8 +107,14 @@ export class GestorPaneles {
       </div>
       <div class="panel-body">
         <div class="panel-info-row">
-          <span>Capacidad ocupada: <strong>${totalBodega} / ${capBodega}</strong> unidades</span>
-          <span>Espacio libre: <strong>${capBodega - totalBodega}</strong></span>
+          <span>
+            Capacidad ocupada: <strong>${totalBodega} / ${capBodega}</strong> un.
+            <span class="tooltip-badge" title="Capacidad: límite máximo de insumos que caben en tu bodega al mismo tiempo.">?</span>
+          </span>
+          <span>
+            Espacio libre: <strong>${capBodega - totalBodega}</strong>
+            <span class="tooltip-badge" title="Costo: dinero invertido en comprar insumos para producir tus pizzas.">?</span>
+          </span>
         </div>
         <div class="item-list" id="lista-insumos"></div>
       </div>
@@ -167,7 +173,10 @@ export class GestorPaneles {
       </div>
       <div class="panel-body">
         <div class="panel-info-row">
-          <span>Capacidad diaria: <strong>${produccionUsada} / ${capacidadProduccion}</strong> pizzas</span>
+          <span>
+            Capacidad diaria: <strong>${produccionUsada} / ${capacidadProduccion}</strong> pizzas
+            <span class="tooltip-badge" title="Capacidad de producción: máximo de pizzas que puedes hornear hoy (dueño + cocineros + hornos).">?</span>
+          </span>
           <span>Disponible hoy: <strong>${restante}</strong></span>
         </div>
         <div class="item-list" id="lista-recetas"></div>
@@ -225,7 +234,10 @@ export class GestorPaneles {
       </div>
       <div class="panel-body">
         <div class="panel-info-row">
-          <span>Capacidad de atención: <strong>${atencion}</strong> clientes/jornada</span>
+          <span>
+            Capacidad de atención: <strong>${atencion}</strong> clientes/día
+            <span class="tooltip-badge" title="Capacidad de atención: máximo de clientes que pueden ser cobrados hoy (dueño + cajeros + caja moderna).">?</span>
+          </span>
           <span>Día: <strong>${this.motor.nombreDia}</strong> (Factor: ${this.motor.factorDia})</span>
         </div>
         <div class="item-list" id="lista-precios"></div>
@@ -403,11 +415,17 @@ export class GestorPaneles {
       `;
     }
 
-    let bannerVictoria = '';
-    if (this.motor.victoria) {
-      bannerVictoria = `
-        <div style="background: linear-gradient(90deg, #f7b731, #fa8231); color: #000; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 8px;">
-          🎉 ¡VICTORIA EMPRESARIAL! Has alcanzado el Nivel 5 con más de Bs 25.000 de capital histórico.
+    let bannerFinal = '';
+    if (resumen.quiebra) {
+      bannerFinal = `
+        <div class="banner-quiebra">
+          💥 <strong>¡QUIEBRA!</strong> Tu capital cayó a Bs ${resumen.capitalFinal}. No pudiste cubrir los gastos del negocio.
+        </div>
+      `;
+    } else if (this.motor.victoria) {
+      bannerFinal = `
+        <div class="banner-victoria">
+          🏆 <strong>¡VICTORIA EMPRESARIAL!</strong> Alcanzaste el Nivel 5 (Bs 25.000+ de capital histórico).
         </div>
       `;
     }
@@ -417,18 +435,27 @@ export class GestorPaneles {
         <div class="panel-title">📊 Resumen del Día ${resumen.dia} (${resumen.nombreDia})</div>
       </div>
       <div class="panel-body">
-        ${bannerVictoria}
+        ${bannerFinal}
         <div class="resumen-finanzas">
           <div class="finanza-box">
-            <div class="item-sub">Ingresos por Ventas</div>
+            <div class="item-sub">
+              Ingreso por Ventas
+              <span class="tooltip-badge" title="Ingreso: dinero total que entra por vender pizzas, antes de restar costos y gastos.">?</span>
+            </div>
             <strong style="color: var(--accent-green);">+ Bs ${resumen.ingresos}</strong>
           </div>
           <div class="finanza-box">
-            <div class="item-sub">Costo de Insumos Usados</div>
+            <div class="item-sub">
+              Costo de Insumos
+              <span class="tooltip-badge" title="Costo: inversión en ingredientes necesarios para fabricar el producto.">?</span>
+            </div>
             <strong style="color: var(--accent-red);">- Bs ${resumen.costoInsumos}</strong>
           </div>
           <div class="finanza-box">
-            <div class="item-sub">Sueldos Pagados</div>
+            <div class="item-sub">
+              Gasto en Sueldos
+              <span class="tooltip-badge" title="Gasto: pago operativo fijo (como sueldos) que se paga al cierre aunque no haya ventas.">?</span>
+            </div>
             <strong style="color: var(--accent-red);">- Bs ${resumen.sueldos}</strong>
           </div>
           <div class="finanza-box ${gananciaClass}">
@@ -453,12 +480,14 @@ export class GestorPaneles {
 
         ${this.generarHistorialMovimientosHTML()}
 
-        <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-          ${
-            resumen.quiebra
-              ? `<button id="btn-reintentar" class="btn-action" style="background: var(--accent-red);">💥 En Quiebra: Reiniciar</button>`
-              : `<button id="btn-siguiente-dia" class="btn-action">➡️ Iniciar Día Siguiente</button>`
-          }
+        <div style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;">
+          ${resumen.quiebra
+        ? `<button id="btn-reintentar" class="btn-action" style="background: var(--accent-red);">💥 Reiniciar Partida</button>`
+        : this.motor.victoria
+          ? `<button id="btn-reintentar" class="btn-secondary">🔄 Nueva Partida</button>
+             <button id="btn-siguiente-dia" class="btn-action">➡️ Seguir Jugando</button>`
+          : `<button id="btn-siguiente-dia" class="btn-action">➡️ Iniciar Día Siguiente</button>`
+      }
         </div>
       </div>
     `;

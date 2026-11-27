@@ -729,4 +729,60 @@ body {
     flex-wrap: wrap;
     gap: 6px;
   }
+
+  #playback-bar {
+    top: 54px;
+    padding: 5px 8px;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+
+  .pb-reloj {
+    min-width: 125px;
+  }
+
+  #tutorial-assistant {
+    bottom: 8px;
+    right: 8px;
+    padding: 8px 10px;
+  }
+}
+
+/* ─── TOOLTIPS EDUCATIVOS Y BANNERS FINALES (Fase 14) ─── */
+.tooltip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 3px;
+  border-radius: 50%;
+  background: rgba(56, 103, 214, 0.35);
+  border: 1px solid rgba(84, 160, 255, 0.6);
+  color: #dfe4ea;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.banner-victoria {
+  background: linear-gradient(90deg, #f7b731, #fa8231);
+  color: #121420;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.banner-quiebra {
+  background: linear-gradient(90deg, #eb3b5a, #c0392b);
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 15px;
+  margin-bottom: 6px;
 }

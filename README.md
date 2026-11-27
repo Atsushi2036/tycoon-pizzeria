@@ -1,30 +1,28 @@
-# 🍕 Simulador Tycoon: Pizzería
+# 🍕 Simulador Tycoon: Pizzería La Nonna
 
-Videojuego educativo de gestión empresarial en navegador web diseñado para estudiantes de 15 a 18 años. El jugador asume la dirección de una pizzería, tomando decisiones de abastecimiento, manufactura, fijación de precios, contratación de personal e inversiones de capital en Bolivia (moneda en **Bolivianos - Bs**).
+Videojuego educativo de gestión empresarial en navegador web diseñado para estudiantes de 15 a 18 años. El jugador asume la dirección de una pizzería en vista cenital 2D, tomando decisiones de abastecimiento, producción, fijación de precios, contratación de personal e inversiones de capital (moneda en **Bolivianos - Bs**).
 
 ---
 
 ## 🎮 Conceptos Empresariales y Educativos
 
-El simulador ayuda a comprender de manera práctica:
-1. **Flujo de Caja y Capital de Trabajo**: Administrar la liquidez inicial (Bs 2.000) evitando el sobreendeudamiento o la quiebra.
-2. **Costos Directos e Indirectos**: Costos variables de insumos por pizza vs. costos fijos de salarios diarios de empleados.
-3. **Elasticidad Precio de la Demanda**: Fijar precios más altos reduce la cantidad de clientes interesados, mientras que precios excesivamente bajos generan demanda pero erosionan el margen unitario.
-4. **Cuellos de Botella Operativos**:
-   - Falta de stock de pizzas listas (demanda perdida por producto no horneado).
-   - Falta de personal de atención / cajeros (demanda perdida por saturación en mostrador).
-5. **Inversiones de Capital (CAPEX)**: Adquisición de mejoras de infraestructura (hornos más grandes, ampliación de bodega, batidoras industriales) que desbloquean economías de escala.
+1. **Flujo de Caja y Capital de Trabajo**: Administrar el capital inicial (Bs 2.000) evitando caer en quiebra.
+2. **Costo vs. Gasto**:
+   - **Costo**: inversión en insumos para producir pizzas.
+   - **Gasto**: salidas operativas fijas (como sueldos diarios del personal).
+3. **Ingreso vs. Ganancia**: Diferencia entre ventas brutas y utilidad neta tras restar costos y sueldos.
+4. **Capacidad y Cuellos de Botella**: Bodega (almacenamiento), Horno/Cocineros (producción) y Caja/Cajeros (atención en fila FIFO).
+5. **Elasticidad Precio de la Demanda**: Precios altos reducen la demanda; precios bajos la aumentan pero reducen el margen unitario.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-- **Vite** como empaquetador y entorno de desarrollo.
-- **TypeScript** con tipado estricto (`strict: true`) en todo el proyecto.
-- **Phaser 3**: Escena visual 2D construida exclusivamente con primitivas geométricas y paletas de color (sin texturas ni dependencias gráficas externas).
-- **HTML5 & CSS3**: Paneles de gestión modal superpuestos y HUD superior de alto rendimiento.
-- **Vitest**: Suite de pruebas unitarias automatizadas para la lógica pura de negocio.
-- **Persistencia**: `localStorage` nativo con exportación/importación en formato JSON versionado.
+- **Vite** + **TypeScript** (`strict: true`)
+- **Phaser 3**: Plano cenital 2D con formas geométricas y texto (sin assets externos), escala responsiva (`Scale.FIT`), mejoras visibles y reproducción en tiempo real del día (08:00–20:00).
+- **HTML5 & CSS3**: HUD superior, controles de reproducción, tutorial guiado, modo desarrollador (`F2`), gráficos SVG hechos a mano y paneles modales con tooltips educativos.
+- **WebAudio API**: Efectos de sonido opcionales (compra, venta, subir de nivel) con botón de silencio (`🔊/🔇`).
+- **Vitest**: Suite automatizada de pruebas unitarias para la lógica pura.
 
 ---
 
@@ -32,38 +30,49 @@ El simulador ayuda a comprender de manera práctica:
 
 ```
 /
-├── GAME_SPEC.md              # Especificación funcional de reglas y fórmulas
-├── index.html                # Contenedor HTML del canvas y la UI
+├── GAME_SPEC.md                     # Especificación funcional de reglas y fórmulas
+├── index.html                       # Contenedor HTML del canvas y la UI
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts            # Configuración de compilación y Vitest
+├── tsconfig.balance.json            # Configuración para compilar el script de balance
+├── vite.config.ts                   # Configuración de compilación y Vitest
 └── src/
     ├── config/
-    │   └── game-config.ts    # Centralización de TODAS las variables numéricas
-    ├── core/                 # Lógica de negocio PURA (sin Phaser ni DOM)
-    │   ├── buffer-circular.ts# Historial de transacciones O(1)
-    │   ├── mascara-bits.ts   # Mejoras compradas en O(1) con operadores binarios
-    │   ├── motor-juego.ts    # Motor maestro de la economía y jornada
-    │   └── tipos.ts          # Interfaces de datos
+    │   ├── game-config.ts           # Todos los valores numéricos, pesos horarios y tutorial
+    │   └── escena-config.ts         # Coordenadas, waypoints y colores del plano cenital
+    ├── core/                        # Lógica PURA (sin Phaser ni DOM)
+    │   ├── buffer-circular.ts       # Historial de transacciones O(1)
+    │   ├── cola-fifo.ts             # Cola FIFO para la fila del mostrador
+    │   ├── controlador-reproduccion.ts # Reloj, velocidad (×1/×2/×4), pausa y salto
+    │   ├── generador-linea-tiempo.ts# Distribuye eventos del núcleo en el tiempo
+    │   ├── mascara-bits.ts          # Mejoras y progreso de tutorial en O(1)
+    │   ├── motor-juego.ts           # Motor maestro de economía, jornada y guardado v4
+    │   ├── prng.ts                  # Generador determinista mulberry32 con semilla
+    │   └── tipos.ts                 # Interfaces compartidas
     ├── scenes/
-    │   └── escena-principal.ts # Escena Phaser interactiva con 4 estaciones
+    │   └── escena-principal.ts      # Escena cenital 2D, mejoras, personal y clientes
+    ├── scripts/
+    │   └── balance.ts               # Simulador headless multi-estrategia
     ├── ui/
-    │   ├── gestor-hud.ts     # Barra superior reactiva (capital, día, nivel)
-    │   ├── gestor-paneles.ts # Modales para Bodega, Horno, Mostrador, Oficina y Resumen
-    │   └── toast.ts          # Notificaciones efímeras
-    ├── tests/                # 65 pruebas unitarias automatizadas con Vitest
-    └── main.ts               # Punto de entrada de la aplicación
+    │   ├── audio.ts                 # Síntesis simple WebAudio con silencio
+    │   ├── gestor-dev.ts            # Panel de desarrollador (F2)
+    │   ├── gestor-hud.ts            # HUD superior y barra de reproducción
+    │   ├── gestor-paneles.ts        # Modales, tooltips, gráficos SVG y resumen
+    │   ├── gestor-tutorial.ts       # Asistente guiado paso a paso
+    │   └── toast.ts                 # Notificaciones efímeras
+    ├── tests/                       # 87 pruebas unitarias automatizadas con Vitest
+    └── main.ts                      # Punto de entrada y orquestación
 ```
 
 ---
 
-## 🚀 Instrucciones de Ejecución Local
+## 🚀 Instrucciones de Ejecución, Pruebas y Balance
 
 ### Prerrequisitos
-- **Node.js** (versión 18 o superior recomendada).
+- **Node.js** (versión 20 o superior recomendada).
 - **npm** instalado en el sistema.
 
-### Pasos
+### Comandos principales
 1. **Instalar dependencias**:
    ```bash
    npm install
@@ -72,84 +81,67 @@ El simulador ayuda a comprender de manera práctica:
    ```bash
    npm run dev
    ```
-   Abre en tu navegador la dirección indicada (por defecto `http://127.0.0.1:5173/`).
+   Abre en tu navegador la URL mostrada por Vite (por defecto `http://localhost:5173/`).
 
-3. **Ejecutar las pruebas unitarias**:
+3. **Ejecutar todas las pruebas unitarias**:
    ```bash
-   npm run test
+   npm test
    ```
 
-4. **Compilar para producción**:
+4. **Ejecutar el simulador de balance económico (500 partidas headless)**:
+   ```bash
+   npm run balance
+   ```
+
+5. **Compilar para producción**:
    ```bash
    npm run build
    ```
-   Los archivos estáticos optimizados se generarán en la carpeta `dist/`.
+   Los archivos estáticos optimizados se generan en `dist/`.
 
 ---
 
-## 🌐 Despliegue en GitHub Pages
+## 🌐 Despliegue (GitHub Pages o Netlify)
 
-Este proyecto ya cuenta con rutas relativas configuradas (`base: './'` en `vite.config.ts`), lo que permite alojarlo directamente en cualquier servidor de archivos estáticos o GitHub Pages.
+Este proyecto usa rutas relativas (`base: './'` en `vite.config.ts`).
 
-### Despliegue Automatizado con GitHub Actions
-Crea el archivo `.github/workflows/deploy.yml` con el siguiente contenido:
+### Opción A — GitHub Pages (GitHub Actions)
+1. Crea `.github/workflows/deploy.yml`:
+   ```yaml
+   name: Deploy to GitHub Pages
+   on:
+     push:
+       branches: [ main ]
+   permissions:
+     contents: read
+     pages: write
+     id-token: write
+   jobs:
+     build-and-deploy:
+       environment:
+         name: github-pages
+         url: ${{ steps.deployment.outputs.page_url }}
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions/setup-node@v4
+           with:
+             node-version: 20
+             cache: 'npm'
+         - run: npm ci
+         - run: npm test
+         - run: npm run build
+         - uses: actions/configure-pages@v4
+         - uses: actions/upload-pages-artifact@v3
+           with:
+             path: './dist'
+         - id: deployment
+           uses: actions/deploy-pages@v4
+   ```
+2. En GitHub ve a **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Enlace esperado tras el despliegue: `https://atsushi2036.github.io/tycoon-pizzeria/`
 
-```yaml
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: [ main ]
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-
-      - name: Build project
-        run: npm run build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-```
-
-Una vez subido a GitHub:
-1. Dirígete a **Settings** > **Pages** en tu repositorio.
-2. En **Build and deployment** > **Source**, selecciona **GitHub Actions**.
-3. Al hacer push a la rama `main`, la web se desplegará automáticamente.
-
+### Opción B — Netlify
+1. Conecta el repositorio en Netlify.
+2. Configura **Build command**: `npm run build` y **Publish directory**: `dist`.
+3. O despliega manualmente arrastrando la carpeta `dist/` en Netlify Drop (`https://app.netlify.com/drop`).

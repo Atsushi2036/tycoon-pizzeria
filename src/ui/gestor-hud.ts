@@ -17,14 +17,22 @@ export class GestorHUD {
   private barraReproduccion: HTMLElement;
   private alAbrirPizzeria: () => void;
   private alGestionPartida: () => void;
+  private alAlternarSilencio?: () => boolean;
+  private silenciado = false;
   private enReproduccion = false;
   private barraInicializada = false;
   private callbacksReproduccion: CallbacksReproduccionHUD | null = null;
 
-  constructor(motor: MotorJuego, alAbrirPizzeria: () => void, alGestionPartida: () => void) {
+  constructor(
+    motor: MotorJuego,
+    alAbrirPizzeria: () => void,
+    alGestionPartida: () => void,
+    alAlternarSilencio?: () => boolean
+  ) {
     this.motor = motor;
     this.alAbrirPizzeria = alAbrirPizzeria;
     this.alGestionPartida = alGestionPartida;
+    this.alAlternarSilencio = alAlternarSilencio;
 
     const app = document.getElementById('app');
 
@@ -100,10 +108,18 @@ export class GestorHUD {
         </span>
       </div>
       <div class="hud-actions">
+        <button id="btn-silencio" class="btn-secondary" title="Silenciar / activar sonido">${this.silenciado ? '🔇' : '🔊'}</button>
         <button id="btn-partida" class="btn-secondary" ${this.enReproduccion ? 'disabled' : ''}>💾 Partida</button>
         <button id="btn-abrir-pizzeria" class="btn-action" ${btnDisabled}>${btnTexto}</button>
       </div>
     `;
+
+    document.getElementById('btn-silencio')?.addEventListener('click', () => {
+      if (this.alAlternarSilencio) {
+        this.silenciado = this.alAlternarSilencio();
+        this.render();
+      }
+    });
 
     document.getElementById('btn-abrir-pizzeria')?.addEventListener('click', () => {
       this.alAbrirPizzeria();
