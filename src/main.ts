@@ -5,6 +5,7 @@ import { ControladorReproduccion } from './core/controlador-reproduccion';
 import { GestorHUD } from './ui/gestor-hud';
 import { GestorPaneles, type TipoEstacion } from './ui/gestor-paneles';
 import { GestorTutorial } from './ui/gestor-tutorial';
+import { GestorDev } from './ui/gestor-dev';
 import { EscenaPrincipal } from './scenes/escena-principal';
 import { Toast } from './ui/toast';
 import { SAVE_KEY } from './config/game-config';
@@ -17,6 +18,7 @@ class AplicacionJuego {
   private hud!: GestorHUD;
   private paneles!: GestorPaneles;
   private tutorial!: GestorTutorial;
+  private devPanel!: GestorDev;
   private juegoPhaser!: Phaser.Game;
   private escena!: EscenaPrincipal;
   private controladorReproduccion: ControladorReproduccion | null = null;
@@ -59,6 +61,7 @@ class AplicacionJuego {
     );
 
     this.tutorial = new GestorTutorial(this.motor, () => this.saltarTutorial());
+    this.devPanel = new GestorDev(this.motor);
   }
 
   private iniciarPhaser(): void {
@@ -127,6 +130,7 @@ class AplicacionJuego {
 
       this.hud.setEnReproduccion(true);
       this.actualizarBarraReproduccion();
+      this.devPanel.setContextoDia(eventos, ctrl);
 
       this.escena.iniciarReproduccion(
         ctrl,
@@ -146,6 +150,7 @@ class AplicacionJuego {
   private actualizarBarraReproduccion(): void {
     if (!this.controladorReproduccion) return;
     const ctrl = this.controladorReproduccion;
+    this.devPanel.render();
     this.hud.renderReproduccion(ctrl, {
       alAlternarPausa: () => {
         ctrl.alternarPausa();
@@ -187,6 +192,7 @@ class AplicacionJuego {
     this.hud.render();
     this.sincronizarEscenaConNucleo(animar);
     this.actualizarTutorial();
+    this.devPanel?.render();
   }
 
   private actualizarTutorial(): void {
