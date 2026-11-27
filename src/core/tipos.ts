@@ -56,6 +56,21 @@ export interface ResultadoOperacion {
   readonly mensaje: string;
 }
 
+// ─── LÍNEA DE TIEMPO ───
+
+/** Tipo de resultado para un cliente en la línea de tiempo */
+export type TipoEventoCliente = 'atendido' | 'sin_stock' | 'sin_cajeros';
+
+/** Evento individual de un cliente durante el día */
+export interface EventoCliente {
+  /** Minuto de llegada desde las 08:00 (0 = 08:00, 720 = 20:00) */
+  readonly horaLlegada: number;
+  /** Id de la pizza que pide el cliente */
+  readonly pizzaId: string;
+  /** Resultado: atendido, se fue por falta de stock, o se fue por falta de cajeros */
+  readonly resultado: TipoEventoCliente;
+}
+
 /** Estado completo del juego (serializable para guardado) */
 export interface EstadoJuego {
   capital: number;
@@ -71,6 +86,7 @@ export interface EstadoJuego {
   costoInsumosHoy: number;                     // acumulado durante PREPARAR
   costoMejorasHoy: number;                     // acumulado durante PREPARAR
   produccionUsadaHoy: number;                  // pizzas producidas hoy
+  semillaPartida: number;                      // semilla PRNG para línea de tiempo
   version: number;                             // para validar al importar
 }
 

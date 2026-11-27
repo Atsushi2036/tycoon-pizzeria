@@ -12,12 +12,12 @@ export const BODEGA_CAPACIDAD_INICIAL = 200;
 
 // ─── INSUMOS: id → costo de compra por unidad (Bs) ───
 export const INSUMOS = {
-  masa:      { nombre: 'Masa',      costo: 4 },
-  salsa:     { nombre: 'Salsa',     costo: 2 },
-  queso:     { nombre: 'Queso',     costo: 6 },
+  masa: { nombre: 'Masa', costo: 4 },
+  salsa: { nombre: 'Salsa', costo: 2 },
+  queso: { nombre: 'Queso', costo: 6 },
   pepperoni: { nombre: 'Pepperoni', costo: 7 },
-  jamon:     { nombre: 'Jamón',     costo: 6 },
-  pina:      { nombre: 'Piña',      costo: 3 },
+  jamon: { nombre: 'Jamón', costo: 6 },
+  pina: { nombre: 'Piña', costo: 3 },
 } as const;
 
 /** Ids válidos de insumos */
@@ -108,7 +108,7 @@ export const NOMBRES_DIAS: readonly string[] = [
 export const PREFERENCIA_PIZZA: Readonly<Record<string, number>> = {
   margarita: 0.40,
   pepperoni: 0.35,
-  hawaiana:  0.25,
+  hawaiana: 0.25,
 };
 
 /**
@@ -174,11 +174,11 @@ export const MEJORAS: readonly Mejora[] = [
 
 /** Efecto numérico de cada mejora (para cálculos en /core) */
 export const MEJORA_EFECTOS = {
-  horno_mediano:       { produccionExtra: 15 },
-  bodega_ampliada:     { bodegaExtra: 200 },
+  horno_mediano: { produccionExtra: 15 },
+  bodega_ampliada: { bodegaExtra: 200 },
   batidora_industrial: { descuentoInsumos: 0.10, insumosAfectados: ['masa', 'salsa', 'queso'] },
-  caja_moderna:        { atencionExtra: 10 },
-  horno_industrial:    { produccionExtra: 40 },
+  caja_moderna: { atencionExtra: 10 },
+  horno_industrial: { produccionExtra: 40 },
 } as const;
 
 // ─── NIVELES ───
@@ -201,7 +201,38 @@ export const NIVEL_VICTORIA = 5;
 /** Tamaño del buffer circular de transacciones */
 export const HISTORIAL_TAMANO = 200;
 
+// ─── LÍNEA DE TIEMPO DEL DÍA ───
+
+/** Hora de inicio del día simulado (08:00) */
+export const HORA_INICIO_DIA = 8;
+
+/** Hora de fin del día simulado (20:00) */
+export const HORA_FIN_DIA = 20;
+
+/** Duración del día en horas */
+export const DURACION_DIA_HORAS = HORA_FIN_DIA - HORA_INICIO_DIA; // 12
+
+/**
+ * Pesos por hora para la distribución de llegada de clientes.
+ * Índice 0 = 08:00–09:00, índice 11 = 19:00–20:00.
+ * Picos suaves al mediodía (12–14) y por la tarde-noche (18–20).
+ */
+export const PESOS_HORA: readonly number[] = [
+  0.5,  // 08:00–09:00 — apertura, poca gente
+  0.6,  // 09:00–10:00
+  0.8,  // 10:00–11:00
+  1.0,  // 11:00–12:00
+  1.5,  // 12:00–13:00 — pico almuerzo
+  1.5,  // 13:00–14:00 — pico almuerzo
+  1.0,  // 14:00–15:00
+  0.7,  // 15:00–16:00
+  0.6,  // 16:00–17:00
+  0.8,  // 17:00–18:00
+  1.3,  // 18:00–19:00 — pico cena
+  1.2,  // 19:00–20:00 — pico cena
+];
+
 // ─── GUARDADO ───
 export const SAVE_KEY = 'pizzeria_tycoon_save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 

@@ -128,5 +128,31 @@ describe('Fase 5: Guardado, Exportar e Importar', () => {
     expect(motor.obtenerEmpleados('cocinero')).toBe(0);
     expect(motor.obtenerHistorial().length).toBe(0);
   });
+
+  it('migra partidas guardadas en versión 1 al formato actual con semillaPartida', () => {
+    const estadoV1 = {
+      capital: 2500,
+      capitalMaxHistorico: 2500,
+      dia: 3,
+      fase: 'preparar',
+      nivel: 1,
+      inventarioInsumos: { masa: 10, salsa: 10, queso: 10, pepperoni: 0, jamon: 0, pina: 0 },
+      inventarioPizzas: { margarita: 2, pepperoni: 0, hawaiana: 0 },
+      empleados: { cocinero: 0, cajero: 0 },
+      mejorasCompradas: 0,
+      preciosVenta: { margarita: 35, pepperoni: 45, hawaiana: 42 },
+      costoInsumosHoy: 0,
+      costoMejorasHoy: 0,
+      produccionUsadaHoy: 0,
+      version: 1,
+    } as unknown as EstadoJuego;
+
+    const res = motor.importarEstado(estadoV1);
+    expect(res.exito).toBe(true);
+    expect(motor.capital).toBe(2500);
+    expect(motor.dia).toBe(3);
+    expect(typeof motor.semillaPartida).toBe('number');
+    expect(motor.exportarEstado().version).toBe(SAVE_VERSION);
+  });
 });
 

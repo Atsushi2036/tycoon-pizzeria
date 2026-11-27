@@ -45,6 +45,7 @@ import type {
 
 import { BufferCircular } from './buffer-circular';
 import { activarBit, consultarBit } from './mascara-bits';
+import { generarSemillaPartida } from './prng';
 
 /**
  * Clase principal del motor de juego.
@@ -98,6 +99,9 @@ export class MotorJuego {
   /** Pizzas producidas hoy (para controlar capacidad) */
   private _produccionUsadaHoy: number;
 
+  /** Semilla fija de la partida para el PRNG de la línea de tiempo */
+  private _semillaPartida: number;
+
   /**
    * Historial de transacciones: buffer circular de tamaño fijo.
    * Justificación: inserción O(1), sin reasignación de memoria.
@@ -118,6 +122,7 @@ export class MotorJuego {
     this._costoInsumosHoy = 0;
     this._costoMejorasHoy = 0;
     this._produccionUsadaHoy = 0;
+    this._semillaPartida = generarSemillaPartida();
     this._historial = new BufferCircular<Transaccion>(HISTORIAL_TAMANO);
 
     // Inicializar inventarios a 0
@@ -150,6 +155,7 @@ export class MotorJuego {
   get costoInsumosHoy(): number { return this._costoInsumosHoy; }
   get costoMejorasHoy(): number { return this._costoMejorasHoy; }
   get produccionUsadaHoy(): number { return this._produccionUsadaHoy; }
+  get semillaPartida(): number { return this._semillaPartida; }
 
   /** Nombre del día de la semana actual */
   get nombreDia(): string {
@@ -630,6 +636,7 @@ export class MotorJuego {
     this._costoInsumosHoy = 0;
     this._costoMejorasHoy = 0;
     this._produccionUsadaHoy = 0;
+    this._semillaPartida = generarSemillaPartida();
   }
 
   /**
@@ -666,21 +673,23 @@ export class MotorJuego {
       costoInsumosHoy: this._costoInsumosHoy,
       costoMejorasHoy: this._costoMejorasHoy,
       produccionUsadaHoy: this._produccionUsadaHoy,
+      semillaPartida: this._semillaPartida,
       version: SAVE_VERSION,
     };
   }
 
   /**
    * Importa un estado previamente exportado.
-   * Valida la versión y la estructura antes de cargar.
+   * Valida la versión (migrando desde v1 si aplica) y la estructura antes de cargar.
    */
   importarEstado(estado: EstadoJuego): ResultadoOperacion {
-    // Validar versión
+    // Validar objeto
     if (!estado || typeof estado !== 'object') {
       return { exito: false, mensaje: 'El archivo de guardado está vacío o corrupto.' };
     }
 
-    if (estado.version !== SAVE_VERSION) {
+    // Validar versión y migrar partidas v1 → v2
+    if (estado.version !== SAVE_VERSION && estado.version !== 1) {
       return { exito: false, mensaje: `Versión incompatible. Esperada: ${SAVE_VERSION}, recibida: ${estado.version}.` };
     }
 
@@ -696,6 +705,11 @@ export class MotorJuego {
       return { exito: false, mensaje: 'El archivo de guardado tiene una estructura o campos inválidos.' };
     }
 
+    // Migración v1 → v2: asignar semilla si no existía
+    const semilla = (typeof estado.semillaPartida === 'number' && !isNaN(estado.semillaPartida))
+      ? estado.semillaPartida
+      : generarSemillaPartida();
+
     // Cargar estado
     this._capital = estado.capital;
     this._capitalMaxHistorico = estado.capitalMaxHistorico;
@@ -706,6 +720,7 @@ export class MotorJuego {
     this._costoInsumosHoy = estado.costoInsumosHoy ?? 0;
     this._costoMejorasHoy = estado.costoMejorasHoy ?? 0;
     this._produccionUsadaHoy = estado.produccionUsadaHoy ?? 0;
+    this._semillaPartida = semilla;
 
     // Restaurar Maps desde objetos planos
     this._inventarioInsumos = new Map(Object.entries(estado.inventarioInsumos));
@@ -732,6 +747,7 @@ export class MotorJuego {
     this._costoInsumosHoy = 0;
     this._costoMejorasHoy = 0;
     this._produccionUsadaHoy = 0;
+    this._semillaPartida = generarSemillaPartida();
 
     this._inventarioInsumos.clear();
     this._inventarioPizzas.clear();

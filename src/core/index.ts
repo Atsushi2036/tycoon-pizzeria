@@ -7,6 +7,8 @@
 export { MotorJuego } from './motor-juego';
 export { BufferCircular } from './buffer-circular';
 export { activarBit, desactivarBit, consultarBit } from './mascara-bits';
+export { mulberry32, calcularSemillaDia, generarSemillaPartida } from './prng';
+export { generarLineaTiempo } from './generador-linea-tiempo';
 export type {
   Transaccion,
   TipoTransaccion,
@@ -15,5 +17,7 @@ export type {
   ResumenJornada,
   ResultadoOperacion,
   EstadoJuego,
+  TipoEventoCliente,
+  EventoCliente,
 } from './tipos';
 
