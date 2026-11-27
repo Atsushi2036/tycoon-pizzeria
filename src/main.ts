@@ -4,6 +4,7 @@ import { generarLineaTiempo } from './core/generador-linea-tiempo';
 import { ControladorReproduccion } from './core/controlador-reproduccion';
 import { GestorHUD } from './ui/gestor-hud';
 import { GestorPaneles, type TipoEstacion } from './ui/gestor-paneles';
+import { GestorTutorial } from './ui/gestor-tutorial';
 import { EscenaPrincipal } from './scenes/escena-principal';
 import { Toast } from './ui/toast';
 import { SAVE_KEY } from './config/game-config';
@@ -15,6 +16,7 @@ class AplicacionJuego {
   private motor: MotorJuego;
   private hud!: GestorHUD;
   private paneles!: GestorPaneles;
+  private tutorial!: GestorTutorial;
   private juegoPhaser!: Phaser.Game;
   private escena!: EscenaPrincipal;
   private controladorReproduccion: ControladorReproduccion | null = null;
@@ -52,8 +54,11 @@ class AplicacionJuego {
       () => this.avanzarDia(),
       () => this.reiniciarPartida(),
       () => this.exportarPartida(),
-      (archivo) => this.importarPartida(archivo)
+      (archivo) => this.importarPartida(archivo),
+      () => this.repetirTutorial()
     );
+
+    this.tutorial = new GestorTutorial(this.motor, () => this.saltarTutorial());
   }
 
   private iniciarPhaser(): void {
@@ -77,6 +82,7 @@ class AplicacionJuego {
       this.escena = this.juegoPhaser.scene.getScene('EscenaPrincipal') as EscenaPrincipal;
       this.escena.events.once('create', () => {
         this.sincronizarEscenaConNucleo(false);
+        this.actualizarTutorial();
       });
       this.escena.scene.restart({
         alSeleccionarEstacion: (estacion: TipoEstacion) => {
@@ -85,7 +91,9 @@ class AplicacionJuego {
             return;
           }
           if (this.motor.fase === 'preparar') {
+            this.motor.evaluarProgresoTutorial(estacion);
             this.paneles.abrir(estacion);
+            this.actualizarTutorial();
           } else if (this.motor.fase === 'cerrar') {
             Toast.mostrar('La jornada está cerrada. Revisa el resumen o inicia el día siguiente.');
           }
@@ -175,8 +183,35 @@ class AplicacionJuego {
   }
 
   private actualizarTodo(animar = true): void {
+    this.motor.evaluarProgresoTutorial();
     this.hud.render();
     this.sincronizarEscenaConNucleo(animar);
+    this.actualizarTutorial();
+  }
+
+  private actualizarTutorial(): void {
+    if (!this.tutorial) return;
+    const paso = this.tutorial.render(Boolean(this.controladorReproduccion));
+    if (this.escena) {
+      this.escena.resaltarEstacionTutorial(
+        this.controladorReproduccion ? null : (paso?.estacion ?? null)
+      );
+    }
+  }
+
+  private saltarTutorial(): void {
+    this.motor.saltarTutorial();
+    this.guardarPartidaAuto();
+    this.actualizarTutorial();
+    Toast.mostrar('Tutorial saltado. Puedes repetirlo desde 💾 Partida.');
+  }
+
+  private repetirTutorial(): void {
+    this.motor.reiniciarTutorial();
+    this.motor.evaluarProgresoTutorial();
+    this.guardarPartidaAuto();
+    this.actualizarTutorial();
+    Toast.mostrar('Tutorial reiniciado.');
   }
 
   private sincronizarEscenaConNucleo(animar: boolean): void {

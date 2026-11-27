@@ -31,6 +31,8 @@ import {
   NIVEL_VICTORIA,
   HISTORIAL_TAMANO,
   HISTORIAL_DIARIO_MAX,
+  TUTORIAL_PASOS,
+  TUTORIAL_BIT_COMPLETADO,
   SAVE_VERSION,
   type InsumoId,
 } from '../config/game-config';
@@ -113,6 +115,9 @@ export class MotorJuego {
   /** Registro acotado por día para gráficos e historial de capital */
   private _historialDiario: RegistroDiario[];
 
+  /** Máscara de bits del progreso del tutorial */
+  private _tutorialProgreso: number;
+
   constructor() {
     this._capital = CAPITAL_INICIAL;
     this._capitalMaxHistorico = CAPITAL_INICIAL;
@@ -130,6 +135,7 @@ export class MotorJuego {
     this._semillaPartida = generarSemillaPartida();
     this._historial = new BufferCircular<Transaccion>(HISTORIAL_TAMANO);
     this._historialDiario = [];
+    this._tutorialProgreso = 0;
 
     // Inicializar inventarios a 0
     for (const id of INSUMO_IDS) {
@@ -162,6 +168,7 @@ export class MotorJuego {
   get costoMejorasHoy(): number { return this._costoMejorasHoy; }
   get produccionUsadaHoy(): number { return this._produccionUsadaHoy; }
   get semillaPartida(): number { return this._semillaPartida; }
+  get tutorialProgreso(): number { return this._tutorialProgreso; }
 
   /** Nombre del día de la semana actual */
   get nombreDia(): string {
@@ -250,6 +257,66 @@ export class MotorJuego {
   /** Consulta si una mejora está comprada */
   tieneMejora(bit: number): boolean {
     return consultarBit(this._mejorasCompradas, bit);
+  }
+
+  // ─── Tutorial (máscara de bits) ───
+
+  /** Indica si el tutorial sigue activo (no completado ni saltado) */
+  tutorialActivo(): boolean {
+    return !consultarBit(this._tutorialProgreso, TUTORIAL_BIT_COMPLETADO);
+  }
+
+  /** Marca un paso del tutorial como completado */
+  completarPasoTutorial(bit: number): void {
+    this._tutorialProgreso = activarBit(this._tutorialProgreso, bit);
+    const todos = TUTORIAL_PASOS.every((p) => consultarBit(this._tutorialProgreso, p.bit));
+    if (todos) {
+      this._tutorialProgreso = activarBit(this._tutorialProgreso, TUTORIAL_BIT_COMPLETADO);
+    }
+  }
+
+  /** Salta el tutorial marcándolo como completado */
+  saltarTutorial(): void {
+    this._tutorialProgreso = activarBit(this._tutorialProgreso, TUTORIAL_BIT_COMPLETADO);
+  }
+
+  /** Reinicia el tutorial para repetirlo desde el paso 1 */
+  reiniciarTutorial(): void {
+    this._tutorialProgreso = 0;
+  }
+
+  /**
+   * Evalúa automáticamente las metas del tutorial según el estado actual.
+   * Si se visitó una estación (ej. 'mostrador'), puede pasarse como parámetro.
+   */
+  evaluarProgresoTutorial(estacionVisitada?: string): void {
+    if (!this.tutorialActivo()) return;
+
+    // Paso 0: comprar insumos básicos (o haber producido ya pizzas)
+    if (
+      (this.obtenerInsumo('masa') >= 10 &&
+        this.obtenerInsumo('salsa') >= 10 &&
+        this.obtenerInsumo('queso') >= 10) ||
+      this._produccionUsadaHoy >= 10 ||
+      this.obtenerPizzas('margarita') >= 10
+    ) {
+      this.completarPasoTutorial(0);
+    }
+
+    // Paso 1: producir al menos 10 margaritas
+    if (this.obtenerPizzas('margarita') >= 10 || this._produccionUsadaHoy >= 10) {
+      this.completarPasoTutorial(1);
+    }
+
+    // Paso 2: revisar el mostrador
+    if (estacionVisitada === 'mostrador') {
+      this.completarPasoTutorial(2);
+    }
+
+    // Paso 3: abrir la pizzería (si los pasos previos ya estaban o se abrió)
+    if (this._fase !== 'preparar') {
+      this.completarPasoTutorial(3);
+    }
   }
 
   /** Obtiene el historial de transacciones */
@@ -697,13 +764,14 @@ export class MotorJuego {
       produccionUsadaHoy: this._produccionUsadaHoy,
       semillaPartida: this._semillaPartida,
       historialDiario: [...this._historialDiario],
+      tutorialProgreso: this._tutorialProgreso,
       version: SAVE_VERSION,
     };
   }
 
   /**
    * Importa un estado previamente exportado.
-   * Valida la versión (migrando desde v1/v2 si aplica) y la estructura antes de cargar.
+   * Valida la versión (migrando desde v1/v2/v3 si aplica) y la estructura antes de cargar.
    */
   importarEstado(estado: EstadoJuego): ResultadoOperacion {
     // Validar objeto
@@ -711,8 +779,13 @@ export class MotorJuego {
       return { exito: false, mensaje: 'El archivo de guardado está vacío o corrupto.' };
     }
 
-    // Validar versión y migrar partidas v1/v2 → v3
-    if (estado.version !== SAVE_VERSION && estado.version !== 1 && estado.version !== 2) {
+    // Validar versión y migrar partidas v1/v2/v3 → v4
+    if (
+      estado.version !== SAVE_VERSION &&
+      estado.version !== 1 &&
+      estado.version !== 2 &&
+      estado.version !== 3
+    ) {
       return { exito: false, mensaje: `Versión incompatible. Esperada: ${SAVE_VERSION}, recibida: ${estado.version}.` };
     }
 
@@ -747,6 +820,10 @@ export class MotorJuego {
     this._historialDiario = Array.isArray(estado.historialDiario)
       ? estado.historialDiario.slice(-HISTORIAL_DIARIO_MAX)
       : [];
+    this._tutorialProgreso =
+      typeof estado.tutorialProgreso === 'number' && !isNaN(estado.tutorialProgreso)
+        ? estado.tutorialProgreso
+        : (estado.dia > 1 ? activarBit(0, TUTORIAL_BIT_COMPLETADO) : 0);
 
     // Restaurar Maps desde objetos planos
     this._inventarioInsumos = new Map(Object.entries(estado.inventarioInsumos));
@@ -781,6 +858,7 @@ export class MotorJuego {
     this._preciosVenta.clear();
     this._historial.limpiar();
     this._historialDiario = [];
+    this._tutorialProgreso = 0;
 
     for (const id of INSUMO_IDS) {
       this._inventarioInsumos.set(id, 0);

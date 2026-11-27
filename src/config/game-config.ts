@@ -241,7 +241,44 @@ export const PESOS_HORA: readonly number[] = [
   1.2,  // 19:00–20:00 — pico cena
 ];
 
+// ─── TUTORIAL (MÁSCARA DE BITS) ───
+export interface PasoTutorialConfig {
+  readonly bit: number;
+  readonly titulo: string;
+  readonly meta: string;
+  readonly estacion: 'bodega' | 'horno' | 'mostrador' | null;
+}
+
+export const TUTORIAL_PASOS: readonly PasoTutorialConfig[] = [
+  {
+    bit: 0,
+    titulo: '1. Compra insumos en la Bodega',
+    meta: 'Haz clic en la 📦 Bodega y compra al menos 10 de Masa, 10 de Salsa y 10 de Queso.',
+    estacion: 'bodega',
+  },
+  {
+    bit: 1,
+    titulo: '2. Produce pizzas en el Horno',
+    meta: 'Entra al 🔥 Horno & Cocina y produce al menos 10 pizzas Margarita.',
+    estacion: 'horno',
+  },
+  {
+    bit: 2,
+    titulo: '3. Revisa tus precios',
+    meta: 'Abre el 🏪 Mostrador para ver tus pizzas y sus precios de venta.',
+    estacion: 'mostrador',
+  },
+  {
+    bit: 3,
+    titulo: '4. ¡Abre la pizzería!',
+    meta: 'Pulsa "🍕 Abrir Pizzería" arriba a la derecha para atender a tus primeros clientes.',
+    estacion: null,
+  },
+] as const;
+
+export const TUTORIAL_BIT_COMPLETADO = 4;
+
 // ─── GUARDADO ───
 export const SAVE_KEY = 'pizzeria_tycoon_save';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 

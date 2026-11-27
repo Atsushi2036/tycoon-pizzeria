@@ -97,6 +97,7 @@ export interface EstadoJuego {
   produccionUsadaHoy: number;                  // pizzas producidas hoy
   semillaPartida: number;                      // semilla PRNG para línea de tiempo
   historialDiario: RegistroDiario[];           // registro acotado por día
+  tutorialProgreso: number;                    // máscara de bits del tutorial
   version: number;                             // para validar al importar
 }
 

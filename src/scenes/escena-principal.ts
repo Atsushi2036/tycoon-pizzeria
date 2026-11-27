@@ -60,6 +60,10 @@ export class EscenaPrincipal extends Phaser.Scene {
   private capaPersonal!: Phaser.GameObjects.Container;
   private ultimoEstadoVisual: EstadoVisualNucleo | null = null;
 
+  // Resaltado del tutorial (Fase 12)
+  private marcoTutorial: Phaser.GameObjects.Graphics | null = null;
+  private tweenTutorial: Phaser.Tweens.Tween | null = null;
+
   constructor() {
     super({ key: 'EscenaPrincipal' });
   }
@@ -93,6 +97,38 @@ export class EscenaPrincipal extends Phaser.Scene {
 
     // 5. Capa para clientes animados durante la reproducción
     this.capaClientes = this.add.layer();
+
+    // 6. Marco de resaltado del tutorial (encima de todo)
+    this.marcoTutorial = this.add.graphics();
+    this.marcoTutorial.setDepth(50);
+  }
+
+  /** Resalta con un marco dorado pulsante la estación indicada por el tutorial */
+  resaltarEstacionTutorial(estacion: 'bodega' | 'horno' | 'mostrador' | null): void {
+    if (!this.marcoTutorial) return;
+
+    if (this.tweenTutorial) {
+      this.tweenTutorial.stop();
+      this.tweenTutorial = null;
+    }
+
+    this.marcoTutorial.clear();
+    this.marcoTutorial.setAlpha(1);
+
+    if (!estacion) return;
+
+    const cfg = ESTACIONES_CONFIG[estacion];
+    this.marcoTutorial.lineStyle(4, 0xf7b731, 1);
+    this.marcoTutorial.strokeRoundedRect(cfg.x - 2, cfg.y - 2, cfg.ancho + 4, cfg.alto + 4, 10);
+
+    this.tweenTutorial = this.tweens.add({
+      targets: this.marcoTutorial,
+      alpha: 0.25,
+      duration: 650,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   /**

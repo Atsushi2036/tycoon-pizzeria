@@ -21,6 +21,7 @@ export class GestorPaneles {
   private alReiniciarPartida: () => void;
   private alExportarPartida: () => void;
   private alImportarPartida: (archivo: File) => void;
+  private alRepetirTutorial?: () => void;
 
   constructor(
     motor: MotorJuego,
@@ -28,7 +29,8 @@ export class GestorPaneles {
     alAvanzarDia: () => void,
     alReiniciarPartida: () => void,
     alExportarPartida: () => void,
-    alImportarPartida: (archivo: File) => void
+    alImportarPartida: (archivo: File) => void,
+    alRepetirTutorial?: () => void
   ) {
     this.motor = motor;
     this.alActualizar = alActualizar;
@@ -36,6 +38,7 @@ export class GestorPaneles {
     this.alReiniciarPartida = alReiniciarPartida;
     this.alExportarPartida = alExportarPartida;
     this.alImportarPartida = alImportarPartida;
+    this.alRepetirTutorial = alRepetirTutorial;
 
     this.overlay = document.createElement('div');
     this.overlay.className = 'modal-overlay hidden';
@@ -594,6 +597,8 @@ export class GestorPaneles {
             <input type="file" id="input-importar" accept=".json" style="display: none;" />
           </label>
 
+          <button id="btn-repetir-tutorial" class="btn-secondary" style="padding: 10px;">🎓 Repetir Tutorial</button>
+
           <button id="btn-nueva-partida" class="btn-mini" style="background: var(--accent-red); padding: 10px; margin-top: 10px;">
             ⚠️ Iniciar Nueva Partida (Borrar progreso)
           </button>
@@ -616,6 +621,11 @@ export class GestorPaneles {
         this.alImportarPartida(fileInput.files[0]);
         this.cerrar();
       }
+    });
+
+    card.querySelector('#btn-repetir-tutorial')?.addEventListener('click', () => {
+      this.alRepetirTutorial?.();
+      this.cerrar();
     });
 
     card.querySelector('#btn-nueva-partida')?.addEventListener('click', () => {
