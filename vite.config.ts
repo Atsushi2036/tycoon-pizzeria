@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './', // Rutas relativas para GitHub Pages
+  base: '/tycoon-pizzeria/', // Rutas relativas para GitHub Pages
   build: {
     outDir: 'dist',
     sourcemap: true,
