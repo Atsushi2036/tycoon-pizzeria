@@ -106,14 +106,42 @@ export const POSICIONES_INTERIOR = {
     { x: 52, y: 155, ancho: 130, alto: 30 },
     { x: 52, y: 205, ancho: 130, alto: 30 },
   ],
+  estantesBodegaExtra: [
+    { x: 215, y: 155, ancho: 130, alto: 30 },
+    { x: 215, y: 205, ancho: 130, alto: 30 },
+  ],
   // Horno base
   hornoBase: { x: 830, y: 165, radio: 44 },
+  // Batidora industrial (cocina)
+  batidoraIndustrial: { x: 438, y: 195 },
   // Mesón de cocina
   mesonCocina: { x: 470, y: 110, ancho: 260, alto: 46 },
   // Caja registradora en el mostrador
   cajaRegistradora: { x: 240, y: 366, ancho: 44, alto: 32 },
   // Escritorio de oficina
   escritorioOficina: { x: 740, y: 465, ancho: 130, alto: 56 },
+  // Puestos de cocineros (en la cocina, frente al mesón/horno)
+  puestosCocineros: [
+    { x: 510, y: 190 },
+    { x: 565, y: 190 },
+    { x: 620, y: 190 },
+    { x: 675, y: 190 },
+    { x: 730, y: 190 },
+  ],
+  // Puestos de cajeros (detrás del mostrador)
+  puestosCajeros: [
+    { x: 145, y: 320 },
+    { x: 195, y: 320 },
+    { x: 295, y: 320 },
+    { x: 345, y: 320 },
+    { x: 395, y: 320 },
+  ],
+} as const;
+
+/** Colores del personal por rol */
+export const COLORES_PERSONAL = {
+  cocinero: 0xff9f43,
+  cajero: 0x00d2d3,
 } as const;
 
 /** Paleta de colores del plano cenital */

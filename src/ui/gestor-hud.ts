@@ -18,6 +18,8 @@ export class GestorHUD {
   private alAbrirPizzeria: () => void;
   private alGestionPartida: () => void;
   private enReproduccion = false;
+  private barraInicializada = false;
+  private callbacksReproduccion: CallbacksReproduccionHUD | null = null;
 
   constructor(motor: MotorJuego, alAbrirPizzeria: () => void, alGestionPartida: () => void) {
     this.motor = motor;
@@ -28,11 +30,18 @@ export class GestorHUD {
 
     this.contenedor = document.createElement('div');
     this.contenedor.id = 'hud-container';
+    this.contenedor.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.contenedor.addEventListener('mousedown', (e) => e.stopPropagation());
+    this.contenedor.addEventListener('click', (e) => e.stopPropagation());
     app?.appendChild(this.contenedor);
 
     this.barraReproduccion = document.createElement('div');
     this.barraReproduccion.id = 'playback-bar';
     this.barraReproduccion.className = 'hidden';
+    this.barraReproduccion.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.barraReproduccion.addEventListener('mousedown', (e) => e.stopPropagation());
+    this.barraReproduccion.addEventListener('mouseup', (e) => e.stopPropagation());
+    this.barraReproduccion.addEventListener('click', (e) => e.stopPropagation());
     app?.appendChild(this.barraReproduccion);
 
     this.render();
@@ -43,6 +52,8 @@ export class GestorHUD {
     if (!activo) {
       this.barraReproduccion.classList.add('hidden');
       this.barraReproduccion.innerHTML = '';
+      this.barraInicializada = false;
+      this.callbacksReproduccion = null;
     } else {
       this.barraReproduccion.classList.remove('hidden');
     }
@@ -107,47 +118,77 @@ export class GestorHUD {
     ctrl: ControladorReproduccion,
     callbacks: CallbacksReproduccionHUD
   ): void {
+    this.callbacksReproduccion = callbacks;
+
+    if (!this.barraInicializada) {
+      this.inicializarDOMReproduccion();
+      this.barraInicializada = true;
+    }
+
     const hora = ctrl.obtenerHoraFormateada();
     const progresoPct = Math.round(ctrl.obtenerProgreso() * 100);
     const vel = ctrl.velocidad;
 
+    const elHora = document.getElementById('pb-hora');
+    const elFill = document.getElementById('pb-fill');
+    const elVentas = document.getElementById('pb-ventas');
+    const elIngresos = document.getElementById('pb-ingresos');
+    const elPerdidos = document.getElementById('pb-perdidos');
+    const btnPausa = document.getElementById('btn-pb-pausa');
+
+    if (elHora) elHora.textContent = hora;
+    if (elFill) elFill.style.width = `${progresoPct}%`;
+    if (elVentas) elVentas.textContent = String(ctrl.ventasEnVivo);
+    if (elIngresos) elIngresos.textContent = String(ctrl.ingresosEnVivo);
+    if (elPerdidos) elPerdidos.textContent = String(ctrl.perdidosEnVivo);
+    if (btnPausa) btnPausa.textContent = ctrl.pausado ? '▶' : '⏸';
+
+    this.barraReproduccion.querySelectorAll('.btn-vel[data-vel]').forEach((btn) => {
+      const v = Number((btn as HTMLElement).dataset.vel);
+      btn.classList.toggle('active', v === vel);
+    });
+  }
+
+  private inicializarDOMReproduccion(): void {
     const botonesVel = VELOCIDADES_REPRODUCCION.map(
-      (v) =>
-        `<button class="btn-vel ${vel === v ? 'active' : ''}" data-vel="${v}">×${v}</button>`
+      (v) => `<button type="button" class="btn-vel" data-vel="${v}">×${v}</button>`
     ).join('');
 
     this.barraReproduccion.innerHTML = `
       <div class="pb-reloj">
-        <span>🕒 <strong>${hora}</strong></span>
+        <span>🕒 <strong id="pb-hora">08:00</strong></span>
         <div class="pb-progress-track">
-          <div class="pb-progress-fill" style="width: ${progresoPct}%"></div>
+          <div id="pb-fill" class="pb-progress-fill" style="width: 0%"></div>
         </div>
       </div>
       <div class="pb-stats">
-        <span>🍕 ${ctrl.ventasEnVivo}</span>
-        <span>💰 Bs ${ctrl.ingresosEnVivo}</span>
-        <span>❌ ${ctrl.perdidosEnVivo}</span>
+        <span>🍕 <span id="pb-ventas">0</span></span>
+        <span>💰 Bs <span id="pb-ingresos">0</span></span>
+        <span>❌ <span id="pb-perdidos">0</span></span>
       </div>
       <div class="pb-controls">
-        <button id="btn-pb-pausa" class="btn-vel">${ctrl.pausado ? '▶' : '⏸'}</button>
+        <button type="button" id="btn-pb-pausa" class="btn-vel">⏸</button>
         ${botonesVel}
-        <button id="btn-pb-saltar" class="btn-skip">⏭ Saltar</button>
+        <button type="button" id="btn-pb-saltar" class="btn-skip">⏭ Saltar</button>
       </div>
     `;
 
-    document.getElementById('btn-pb-pausa')?.addEventListener('click', () => {
-      callbacks.alAlternarPausa();
+    document.getElementById('btn-pb-pausa')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacksReproduccion?.alAlternarPausa();
     });
 
     this.barraReproduccion.querySelectorAll('.btn-vel[data-vel]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const v = Number((btn as HTMLElement).dataset.vel) as VelocidadReproduccion;
-        callbacks.alCambiarVelocidad(v);
+        this.callbacksReproduccion?.alCambiarVelocidad(v);
       });
     });
 
-    document.getElementById('btn-pb-saltar')?.addEventListener('click', () => {
-      callbacks.alSaltarDia();
+    document.getElementById('btn-pb-saltar')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacksReproduccion?.alSaltarDia();
     });
   }
 

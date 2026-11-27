@@ -75,6 +75,9 @@ class AplicacionJuego {
     // Conectar eventos cuando la escena esté lista
     this.juegoPhaser.events.once('ready', () => {
       this.escena = this.juegoPhaser.scene.getScene('EscenaPrincipal') as EscenaPrincipal;
+      this.escena.events.once('create', () => {
+        this.sincronizarEscenaConNucleo(false);
+      });
       this.escena.scene.restart({
         alSeleccionarEstacion: (estacion: TipoEstacion) => {
           if (this.controladorReproduccion) {
@@ -171,8 +174,22 @@ class AplicacionJuego {
     Toast.mostrar(`Comenzando ${this.motor.nombreDia}. ¡Buena suerte con las ventas!`);
   }
 
-  private actualizarTodo(): void {
+  private actualizarTodo(animar = true): void {
     this.hud.render();
+    this.sincronizarEscenaConNucleo(animar);
+  }
+
+  private sincronizarEscenaConNucleo(animar: boolean): void {
+    if (!this.escena) return;
+    this.escena.sincronizarConNucleo(
+      {
+        mejorasCompradas: this.motor.mejorasCompradas,
+        cocineros: this.motor.obtenerEmpleados('cocinero'),
+        cajeros: this.motor.obtenerEmpleados('cajero'),
+        nivel: this.motor.nivel,
+      },
+      animar
+    );
   }
 
   // ─── Guardado y Persistencia ───
@@ -200,7 +217,7 @@ class AplicacionJuego {
   private reiniciarPartida(): void {
     localStorage.removeItem(SAVE_KEY);
     this.motor.reiniciar();
-    this.actualizarTodo();
+    this.actualizarTodo(false);
     Toast.mostrar('Partida reiniciada desde cero.');
   }
 
@@ -225,7 +242,7 @@ class AplicacionJuego {
         const res = this.motor.importarEstado(estado);
         if (res.exito) {
           this.guardarPartidaAuto();
-          this.actualizarTodo();
+          this.actualizarTodo(false);
           Toast.mostrar(res.mensaje);
         } else {
           alert(`Error al importar: ${res.mensaje}`);

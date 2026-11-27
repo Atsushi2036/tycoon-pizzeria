@@ -3,6 +3,8 @@ import type { TipoEstacion } from '../ui/gestor-paneles';
 import type { EventoCliente } from '../core/tipos';
 import { ColaFIFO } from '../core/cola-fifo';
 import { ControladorReproduccion } from '../core/controlador-reproduccion';
+import { consultarBit } from '../core/mascara-bits';
+import { MEJORAS } from '../config/game-config';
 import {
   ANCHO_JUEGO,
   ALTO_JUEGO,
@@ -13,12 +15,20 @@ import {
   POSICIONES_INTERIOR,
   COLORES_ESCENA,
   COLORES_PIZZA_CLIENTE,
+  COLORES_PERSONAL,
   RUTAS_CLIENTES,
   type ConfigEstacion,
 } from '../config/escena-config';
 
 export interface DatosEscenaPrincipal {
   alSeleccionarEstacion: (estacion: TipoEstacion) => void;
+}
+
+export interface EstadoVisualNucleo {
+  mejorasCompradas: number;
+  cocineros: number;
+  cajeros: number;
+  nivel: number;
 }
 
 interface ClienteVisual {
@@ -45,6 +55,11 @@ export class EscenaPrincipal extends Phaser.Scene {
   private puestosOcupados: Array<ClienteVisual | null> = [];
   private capaClientes!: Phaser.GameObjects.Layer;
 
+  // Capa dinámica de mejoras y personal (Fase 10)
+  private capaMejoras!: Phaser.GameObjects.Container;
+  private capaPersonal!: Phaser.GameObjects.Container;
+  private ultimoEstadoVisual: EstadoVisualNucleo | null = null;
+
   constructor() {
     super({ key: 'EscenaPrincipal' });
   }
@@ -60,12 +75,16 @@ export class EscenaPrincipal extends Phaser.Scene {
     // 2. Paredes perimetrales, tabiques interiores y puerta principal
     this.dibujarParedesYPuerta();
 
-    // 3. Mobiliario cenital (estantes, cocina/horno, mostrador/caja, mesas, oficina)
+    // 3. Mobiliario cenital base (estantes, cocina, mostrador, mesas, oficina)
     this.dibujarBodega();
     this.dibujarCocinaYHorno();
     this.dibujarMostrador();
     this.dibujarZonaMesas();
     this.dibujarOficina();
+
+    // 3b. Capas dinámicas leídas desde el núcleo (mejoras y personal)
+    this.capaMejoras = this.add.container(0, 0);
+    this.capaPersonal = this.add.container(0, 0);
 
     // 4. Zonas clicables con resaltado hover para las 4 estaciones
     for (const cfg of Object.values(ESTACIONES_CONFIG)) {
@@ -74,6 +93,293 @@ export class EscenaPrincipal extends Phaser.Scene {
 
     // 5. Capa para clientes animados durante la reproducción
     this.capaClientes = this.add.layer();
+  }
+
+  /**
+   * Sincroniza las mejoras y el personal visibles con el estado del núcleo.
+   * Todo se dibuja a partir del estado del núcleo, nunca al revés.
+   */
+  sincronizarConNucleo(estado: EstadoVisualNucleo, animar = true): void {
+    if (!this.capaMejoras || !this.capaPersonal) return;
+
+    const previo = this.ultimoEstadoVisual;
+    this.ultimoEstadoVisual = { ...estado };
+
+    // Limpiar y redibujar mejoras según la máscara de bits
+    this.capaMejoras.removeAll(true);
+    this.dibujarMejorasDesdeMascara(estado.mejorasCompradas, previo, animar);
+
+    // Limpiar y redibujar personal según cantidades en el núcleo
+    this.capaPersonal.removeAll(true);
+    this.dibujarPersonalDesdeNucleo(estado.cocineros, estado.cajeros, previo, animar);
+
+    // Aviso de subida de nivel
+    if (animar && previo && estado.nivel > previo.nivel) {
+      this.mostrarAvisoNivel(estado.nivel);
+    }
+  }
+
+  private dibujarMejorasDesdeMascara(
+    mascara: number,
+    previo: EstadoVisualNucleo | null,
+    animar: boolean
+  ): void {
+    const recienComprada = (bit: number) =>
+      animar && previo !== null && !consultarBit(previo.mejorasCompradas, bit) && consultarBit(mascara, bit);
+
+    // 1. Horno (base vs mediano bit 0 vs industrial bit 4)
+    const { hornoBase } = POSICIONES_INTERIOR;
+    const tieneIndustrial = consultarBit(mascara, 4);
+    const tieneMediano = consultarBit(mascara, 0);
+
+    const contHorno = this.add.container(hornoBase.x, hornoBase.y);
+    const gfxHorno = this.add.graphics();
+
+    if (tieneIndustrial) {
+      // Horno industrial: gran cámara metálica con doble boca de calor
+      gfxHorno.fillStyle(0x4b5563, 1);
+      gfxHorno.fillRoundedRect(-58, -48, 116, 96, 10);
+      gfxHorno.lineStyle(4, 0x9ca3af, 1);
+      gfxHorno.strokeRoundedRect(-58, -48, 116, 96, 10);
+      // Doble fuego industrial
+      gfxHorno.fillStyle(0xff4757, 0.95);
+      gfxHorno.fillCircle(-24, -14, 15);
+      gfxHorno.fillCircle(-24, 18, 15);
+      gfxHorno.fillStyle(0xfeca57, 0.95);
+      gfxHorno.fillCircle(-26, -14, 7);
+      gfxHorno.fillCircle(-26, 18, 7);
+      // Luz indicadora
+      gfxHorno.fillStyle(0x2ed573, 1);
+      gfxHorno.fillCircle(38, -30, 5);
+    } else if (tieneMediano) {
+      // Horno mediano: piedra reforzada más grande con borde dorado y fuego amplio
+      gfxHorno.fillStyle(0x8e3b28, 1);
+      gfxHorno.fillCircle(0, 0, 52);
+      gfxHorno.lineStyle(4, 0xf39c12, 1);
+      gfxHorno.strokeCircle(0, 0, 52);
+      gfxHorno.fillStyle(0xff6b35, 0.95);
+      gfxHorno.fillCircle(-18, 0, 20);
+      gfxHorno.fillStyle(0xfeca57, 0.95);
+      gfxHorno.fillCircle(-20, 0, 10);
+    } else {
+      // Horno inicial
+      gfxHorno.fillStyle(COLORES_ESCENA.hornoPiedra, 1);
+      gfxHorno.fillCircle(0, 0, hornoBase.radio);
+      gfxHorno.lineStyle(4, 0x4a2318, 1);
+      gfxHorno.strokeCircle(0, 0, hornoBase.radio);
+      gfxHorno.fillStyle(COLORES_ESCENA.hornoFuego, 0.9);
+      gfxHorno.fillCircle(-16, 0, 16);
+      gfxHorno.fillStyle(0xfeca57, 0.9);
+      gfxHorno.fillCircle(-18, 0, 8);
+    }
+    contHorno.add(gfxHorno);
+    this.capaMejoras.add(contHorno);
+
+    if (recienComprada(4)) {
+      this.animarAparicion(contHorno);
+      const m = MEJORAS.find((x) => x.bit === 4);
+      if (m) this.mostrarTextoFlotante(hornoBase.x, hornoBase.y - 55, `−Bs ${m.costo}`, '#ff6b6b');
+    } else if (recienComprada(0)) {
+      this.animarAparicion(contHorno);
+      const m = MEJORAS.find((x) => x.bit === 0);
+      if (m) this.mostrarTextoFlotante(hornoBase.x, hornoBase.y - 55, `−Bs ${m.costo}`, '#ff6b6b');
+    }
+
+    // 2. Bodega ampliada (bit 1): estantes extra
+    if (consultarBit(mascara, 1)) {
+      const contBodegaExtra = this.add.container(0, 0);
+      const gfxBod = this.add.graphics();
+      const colores = [0x63cdda, 0xf8a5c2, 0xf5cd79, 0x786fa6];
+
+      POSICIONES_INTERIOR.estantesBodegaExtra.forEach((est, idx) => {
+        gfxBod.fillStyle(COLORES_ESCENA.estante, 1);
+        gfxBod.fillRoundedRect(est.x, est.y, est.ancho, est.alto, 4);
+        gfxBod.lineStyle(2, 0xf39c12, 0.9);
+        gfxBod.strokeRoundedRect(est.x, est.y, est.ancho, est.alto, 4);
+        for (let i = 0; i < 4; i++) {
+          gfxBod.fillStyle(colores[(idx + i) % colores.length], 0.95);
+          gfxBod.fillRect(est.x + 8 + i * 30, est.y + 6, 22, 18);
+        }
+      });
+      contBodegaExtra.add(gfxBod);
+      this.capaMejoras.add(contBodegaExtra);
+
+      if (recienComprada(1)) {
+        this.animarAparicion(contBodegaExtra);
+        const m = MEJORAS.find((x) => x.bit === 1);
+        if (m) this.mostrarTextoFlotante(280, 150, `−Bs ${m.costo}`, '#f39c12');
+      }
+    }
+
+    // 3. Batidora industrial (bit 2)
+    if (consultarBit(mascara, 2)) {
+      const bat = POSICIONES_INTERIOR.batidoraIndustrial;
+      const contBat = this.add.container(bat.x, bat.y);
+      const gfxBat = this.add.graphics();
+      gfxBat.fillStyle(0xbdc3c7, 1);
+      gfxBat.fillCircle(0, 0, 18);
+      gfxBat.lineStyle(3, 0x7f8c8d, 1);
+      gfxBat.strokeCircle(0, 0, 18);
+      gfxBat.fillStyle(0x2c3e50, 1);
+      gfxBat.fillCircle(0, 0, 8);
+      gfxBat.fillStyle(0x3498db, 1);
+      gfxBat.fillRect(-4, -18, 8, 8);
+      contBat.add(gfxBat);
+      this.capaMejoras.add(contBat);
+
+      if (recienComprada(2)) {
+        this.animarAparicion(contBat);
+        const m = MEJORAS.find((x) => x.bit === 2);
+        if (m) this.mostrarTextoFlotante(bat.x, bat.y - 28, `−Bs ${m.costo}`, '#54a0ff');
+      }
+    }
+
+    // 4. Caja registradora (base vs caja moderna bit 3)
+    const caja = POSICIONES_INTERIOR.cajaRegistradora;
+    const contCaja = this.add.container(caja.x + caja.ancho / 2, caja.y - 4);
+    const gfxCaja = this.add.graphics();
+    if (consultarBit(mascara, 3)) {
+      // Caja moderna: pantalla táctil azul brillante + impresora
+      gfxCaja.fillStyle(0x1e272e, 1);
+      gfxCaja.fillRoundedRect(-26, -18, 52, 36, 5);
+      gfxCaja.lineStyle(2, 0x00d2d3, 1);
+      gfxCaja.strokeRoundedRect(-26, -18, 52, 36, 5);
+      gfxCaja.fillStyle(0x0abde3, 0.95);
+      gfxCaja.fillRect(-18, -12, 36, 16);
+      gfxCaja.fillStyle(0xecf0f1, 1);
+      gfxCaja.fillRect(-10, 8, 20, 6);
+    } else {
+      gfxCaja.fillStyle(COLORES_ESCENA.caja, 1);
+      gfxCaja.fillRoundedRect(-22, -16, 44, 32, 4);
+      gfxCaja.fillStyle(0x2ecc71, 0.9);
+      gfxCaja.fillRect(-14, -10, 28, 10);
+    }
+    contCaja.add(gfxCaja);
+    this.capaMejoras.add(contCaja);
+
+    if (recienComprada(3)) {
+      this.animarAparicion(contCaja);
+      const m = MEJORAS.find((x) => x.bit === 3);
+      if (m) this.mostrarTextoFlotante(caja.x + 22, caja.y - 32, `−Bs ${m.costo}`, '#2ecc71');
+    }
+  }
+
+  private dibujarPersonalDesdeNucleo(
+    cocineros: number,
+    cajeros: number,
+    previo: EstadoVisualNucleo | null,
+    animar: boolean
+  ): void {
+    // Cocineros
+    for (let i = 0; i < Math.min(cocineros, POSICIONES_INTERIOR.puestosCocineros.length); i++) {
+      const pos = POSICIONES_INTERIOR.puestosCocineros[i];
+      const esNuevo = animar && previo !== null && i >= previo.cocineros;
+      this.crearEmpleadoVisual(pos.x, pos.y, COLORES_PERSONAL.cocinero, '👨‍🍳', esNuevo);
+    }
+
+    // Cajeros
+    for (let i = 0; i < Math.min(cajeros, POSICIONES_INTERIOR.puestosCajeros.length); i++) {
+      const pos = POSICIONES_INTERIOR.puestosCajeros[i];
+      const esNuevo = animar && previo !== null && i >= previo.cajeros;
+      this.crearEmpleadoVisual(pos.x, pos.y, COLORES_PERSONAL.cajero, '💳', esNuevo);
+    }
+  }
+
+  private crearEmpleadoVisual(
+    x: number,
+    y: number,
+    color: number,
+    icono: string,
+    esNuevo: boolean
+  ): void {
+    const cont = this.add.container(x, y);
+    const circulo = this.add.circle(0, 0, 12, color, 1);
+    circulo.setStrokeStyle(2, 0xffffff, 0.95);
+    const txt = this.add.text(0, 0, icono, { fontSize: '12px' }).setOrigin(0.5);
+    cont.add([circulo, txt]);
+    this.capaPersonal.add(cont);
+
+    if (esNuevo) {
+      this.animarAparicion(cont);
+    }
+
+    // Animación suave de "trabajo"
+    this.tweens.add({
+      targets: cont,
+      y: y - 3,
+      duration: 650,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private animarAparicion(target: Phaser.GameObjects.Container): void {
+    target.setScale(0.2);
+    this.tweens.add({
+      targets: target,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 380,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  private mostrarTextoFlotante(x: number, y: number, texto: string, color: string): void {
+    const txt = this.add.text(x, y, texto, {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '15px',
+      fontStyle: 'bold',
+      color,
+      stroke: '#121420',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: txt,
+      y: y - 36,
+      alpha: 0,
+      duration: 1200,
+      ease: 'Cubic.easeOut',
+      onComplete: () => txt.destroy(),
+    });
+  }
+
+  private mostrarAvisoNivel(nuevoNivel: number): void {
+    const banner = this.add.text(
+      ANCHO_JUEGO / 2,
+      140,
+      `⭐ ¡SUBISTE A NIVEL ${nuevoNivel}! ⭐`,
+      {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: '#f7b731',
+        backgroundColor: 'rgba(15, 18, 32, 0.9)',
+        padding: { x: 16, y: 8 },
+        stroke: '#000000',
+        strokeThickness: 4,
+      }
+    ).setOrigin(0.5);
+
+    banner.setScale(0.5);
+    this.tweens.add({
+      targets: banner,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: banner,
+          y: 110,
+          alpha: 0,
+          delay: 1400,
+          duration: 600,
+          onComplete: () => banner.destroy(),
+        });
+      },
+    });
   }
 
   /** Inicia la reproducción visual de la jornada en la escena */
@@ -418,10 +724,10 @@ export class EscenaPrincipal extends Phaser.Scene {
     this.crearEtiquetaZona(bod.x + 275, bod.y + 32, bod.titulo, bod.subtitulo, '#f39c12');
   }
 
-  /** Dibuja el mesón de preparación y el horno de pizza visto desde arriba */
+  /** Dibuja el mesón de preparación (el horno se dibuja dinámicamente según mejoras) */
   private dibujarCocinaYHorno(): void {
     const gfx = this.add.graphics();
-    const { mesonCocina, hornoBase } = POSICIONES_INTERIOR;
+    const { mesonCocina } = POSICIONES_INTERIOR;
 
     // Mesón de preparación de acero inoxidable
     gfx.fillStyle(COLORES_ESCENA.meson, 1);
@@ -436,23 +742,11 @@ export class EscenaPrincipal extends Phaser.Scene {
     gfx.fillStyle(0xe74c3c, 0.85);
     gfx.fillCircle(mesonCocina.x + 125, mesonCocina.y + 23, 10);
 
-    // Horno de ladrillo base (vista cenital circular)
-    gfx.fillStyle(COLORES_ESCENA.hornoPiedra, 1);
-    gfx.fillCircle(hornoBase.x, hornoBase.y, hornoBase.radio);
-    gfx.lineStyle(4, 0x4a2318, 1);
-    gfx.strokeCircle(hornoBase.x, hornoBase.y, hornoBase.radio);
-
-    // Boca/fuego del horno
-    gfx.fillStyle(COLORES_ESCENA.hornoFuego, 0.9);
-    gfx.fillCircle(hornoBase.x - 16, hornoBase.y, 16);
-    gfx.fillStyle(0xfeca57, 0.9);
-    gfx.fillCircle(hornoBase.x - 18, hornoBase.y, 8);
-
     const hor = ESTACIONES_CONFIG.horno;
     this.crearEtiquetaZona(hor.x + 200, hor.y + 205, hor.titulo, hor.subtitulo, '#ff6b6b');
   }
 
-  /** Dibuja el mostrador de atención, vitrina y caja registradora */
+  /** Dibuja el mostrador de atención y vitrina (la caja se dibuja dinámicamente) */
   private dibujarMostrador(): void {
     const gfx = this.add.graphics();
     const mos = ESTACIONES_CONFIG.mostrador;
@@ -462,13 +756,6 @@ export class EscenaPrincipal extends Phaser.Scene {
     gfx.fillRoundedRect(mos.x, mos.y, mos.ancho, 42, 6);
     gfx.fillStyle(COLORES_ESCENA.mostradorTope, 1);
     gfx.fillRoundedRect(mos.x + 4, mos.y + 4, mos.ancho - 8, 34, 4);
-
-    // Caja registradora
-    const caja = POSICIONES_INTERIOR.cajaRegistradora;
-    gfx.fillStyle(COLORES_ESCENA.caja, 1);
-    gfx.fillRoundedRect(caja.x, caja.y - 20, caja.ancho, caja.alto, 4);
-    gfx.fillStyle(0x2ecc71, 0.9);
-    gfx.fillRect(caja.x + 8, caja.y - 14, 28, 10);
 
     // Vitrina de pizzas en el mostrador
     gfx.fillStyle(0xdfe6e9, 0.3);
