@@ -31,8 +31,10 @@ body {
 
 #app {
   position: relative;
-  width: 960px;
-  height: 640px;
+  width: min(100vw, 150vh);
+  height: min(100vh, 66.6667vw);
+  max-width: 960px;
+  max-height: 640px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
   border-radius: 8px;
   overflow: hidden;
@@ -348,4 +350,51 @@ body {
 #toast.show {
   opacity: 1;
   transform: translate(-50%, -10px);
+}
+
+/* ─── RESPONSIVE / MÓVIL ─── */
+@media (max-width: 720px) {
+  #hud-container {
+    height: 52px;
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .hud-label {
+    font-size: 9px;
+  }
+
+  .hud-value {
+    font-size: 13px;
+  }
+
+  .btn-action {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .btn-secondary {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .modal-overlay {
+    top: 52px;
+    height: calc(100% - 52px);
+  }
+
+  .panel-card {
+    width: 94%;
+    max-height: 92%;
+  }
+
+  .panel-title {
+    font-size: 15px;
+  }
+
+  .item-row {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 }

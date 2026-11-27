@@ -5,6 +5,7 @@ import { GestorPaneles, type TipoEstacion } from './ui/gestor-paneles';
 import { EscenaPrincipal } from './scenes/escena-principal';
 import { Toast } from './ui/toast';
 import { SAVE_KEY } from './config/game-config';
+import { ANCHO_JUEGO, ALTO_JUEGO } from './config/escena-config';
 import type { EstadoJuego } from './core/tipos';
 import './style.css';
 
@@ -54,9 +55,13 @@ class AplicacionJuego {
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
       parent: 'game-container',
-      width: 960,
-      height: 640,
+      width: ANCHO_JUEGO,
+      height: ALTO_JUEGO,
       backgroundColor: '#121420',
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
       scene: [EscenaPrincipal],
     };
 
