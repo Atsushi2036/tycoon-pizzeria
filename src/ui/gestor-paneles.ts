@@ -1,6 +1,14 @@
 import type { MotorJuego } from '../core/motor-juego';
-import type { ResumenJornada } from '../core/tipos';
-import { INSUMOS, INSUMO_IDS, RECETAS, MEJORAS, TIPOS_EMPLEADO, type InsumoId } from '../config/game-config';
+import type { RegistroDiario, ResumenJornada } from '../core/tipos';
+import {
+  CAPITAL_INICIAL,
+  INSUMOS,
+  INSUMO_IDS,
+  RECETAS,
+  MEJORAS,
+  TIPOS_EMPLEADO,
+  type InsumoId,
+} from '../config/game-config';
 import { Toast } from './toast';
 
 export type TipoEstacion = 'bodega' | 'horno' | 'mostrador' | 'oficina' | 'resumen' | 'partida';
@@ -431,10 +439,16 @@ export class GestorPaneles {
           <span>Nivel actual: <strong>Nivel ${this.motor.nivel}</strong></span>
         </div>
 
+        ${this.generarDesgloseVisualHTML(resumen)}
+
+        ${this.generarGraficoCapitalSVG(this.motor.obtenerHistorialDiario())}
+
         <h4 style="margin-top: 4px;">Detalle de Ventas</h4>
         <div class="item-list">${filasVentasHtml}</div>
 
         ${mensajesEduHtml}
+
+        ${this.generarHistorialMovimientosHTML()}
 
         <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
           ${
@@ -455,6 +469,111 @@ export class GestorPaneles {
       this.alReiniciarPartida();
       this.cerrar();
     });
+  }
+
+  /** Desglose visual horizontal: Ingresos vs Costos vs Sueldos */
+  private generarDesgloseVisualHTML(resumen: ResumenJornada): string {
+    const costos = resumen.costoInsumos + resumen.costoMejoras;
+    const maxVal = Math.max(1, resumen.ingresos, costos, resumen.sueldos);
+    const pctIng = Math.round((resumen.ingresos / maxVal) * 100);
+    const pctCos = Math.round((costos / maxVal) * 100);
+    const pctSue = Math.round((resumen.sueldos / maxVal) * 100);
+
+    return `
+      <div class="chart-box">
+        <div class="chart-title">📊 Ingresos vs Costos vs Sueldos</div>
+        <div class="bar-row">
+          <span class="bar-label">Ingresos</span>
+          <div class="bar-track"><div class="bar-fill bar-ingresos" style="width:${pctIng}%"></div></div>
+          <span class="bar-val">Bs ${resumen.ingresos}</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Costos</span>
+          <div class="bar-track"><div class="bar-fill bar-costos" style="width:${pctCos}%"></div></div>
+          <span class="bar-val">Bs ${costos}</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Sueldos</span>
+          <div class="bar-track"><div class="bar-fill bar-sueldos" style="width:${pctSue}%"></div></div>
+          <span class="bar-val">Bs ${resumen.sueldos}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /** Gráfico de línea del capital por día dibujado a mano con SVG (sin librerías) */
+  private generarGraficoCapitalSVG(registros: readonly RegistroDiario[]): string {
+    const puntosDatos = [
+      { dia: 0, capital: CAPITAL_INICIAL },
+      ...registros.map((r) => ({ dia: r.dia, capital: r.capitalFinal })),
+    ];
+
+    const w = 480;
+    const h = 110;
+    const padX = 42;
+    const padY = 16;
+    const innerW = w - padX * 2;
+    const innerH = h - padY * 2;
+
+    const valores = puntosDatos.map((p) => p.capital);
+    const minCap = Math.min(...valores, 0);
+    const maxCap = Math.max(...valores, CAPITAL_INICIAL + 500);
+    const rango = Math.max(1, maxCap - minCap);
+
+    const coords = puntosDatos.map((p, idx) => {
+      const x = padX + (puntosDatos.length === 1 ? innerW / 2 : (idx / (puntosDatos.length - 1)) * innerW);
+      const y = padY + innerH - ((p.capital - minCap) / rango) * innerH;
+      return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, ...p };
+    });
+
+    const polyline = coords.map((c) => `${c.x},${c.y}`).join(' ');
+    const circulos = coords
+      .map(
+        (c) =>
+          `<circle cx="${c.x}" cy="${c.y}" r="3.5" fill="#f7b731" stroke="#121420" stroke-width="1.5"><title>Día ${c.dia}: Bs ${c.capital}</title></circle>`
+      )
+      .join('');
+
+    return `
+      <div class="chart-box">
+        <div class="chart-title">📈 Evolución del Capital (Bs)</div>
+        <svg viewBox="0 0 ${w} ${h}" class="capital-svg" aria-label="Gráfico de capital por día">
+          <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${h - padY}" stroke="#4b6584" stroke-width="1" />
+          <line x1="${padX}" y1="${h - padY}" x2="${w - padX}" y2="${h - padY}" stroke="#4b6584" stroke-width="1" />
+          <text x="${padX - 4}" y="${padY + 6}" text-anchor="end" fill="#a4b0be" font-size="9">${maxCap}</text>
+          <text x="${padX - 4}" y="${h - padY}" text-anchor="end" fill="#a4b0be" font-size="9">${minCap}</text>
+          <polyline fill="none" stroke="#f7b731" stroke-width="2.5" stroke-linejoin="round" points="${polyline}" />
+          ${circulos}
+        </svg>
+      </div>
+    `;
+  }
+
+  /** Historial de movimientos leyendo el buffer circular (más recientes primero) */
+  private generarHistorialMovimientosHTML(): string {
+    const movimientos = this.motor.obtenerHistorial().slice(-15).reverse();
+    if (movimientos.length === 0) return '';
+
+    const filas = movimientos
+      .map((m) => {
+        const signo = m.monto > 0 ? '+' : '';
+        const color = m.monto > 0 ? 'var(--accent-green)' : m.monto < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
+        const montoStr = m.monto === 0 ? '—' : `${signo}Bs ${m.monto}`;
+        return `
+          <div class="hist-row">
+            <span class="hist-desc">Día ${m.dia} · ${m.descripcion}</span>
+            <span class="hist-monto" style="color:${color};">${montoStr}</span>
+          </div>
+        `;
+      })
+      .join('');
+
+    return `
+      <details class="hist-details">
+        <summary>📜 Historial de Movimientos (${this.motor.obtenerHistorial().length} en buffer)</summary>
+        <div class="hist-list">${filas}</div>
+      </details>
+    `;
   }
 
   // ─── PANEL 6: GESTIÓN DE PARTIDA ───

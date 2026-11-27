@@ -201,6 +201,9 @@ export const NIVEL_VICTORIA = 5;
 /** Tamaño del buffer circular de transacciones */
 export const HISTORIAL_TAMANO = 200;
 
+/** Máximo de días conservados en el registro diario acotado */
+export const HISTORIAL_DIARIO_MAX = 60;
+
 // ─── LÍNEA DE TIEMPO DEL DÍA ───
 
 /** Hora de inicio del día simulado (08:00) */
@@ -240,5 +243,5 @@ export const PESOS_HORA: readonly number[] = [
 
 // ─── GUARDADO ───
 export const SAVE_KEY = 'pizzeria_tycoon_save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 

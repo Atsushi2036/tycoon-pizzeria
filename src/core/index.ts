@@ -21,5 +21,6 @@ export type {
   EstadoJuego,
   TipoEventoCliente,
   EventoCliente,
+  RegistroDiario,
 } from './tipos';
 

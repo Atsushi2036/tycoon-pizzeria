@@ -440,6 +440,100 @@ body {
   background: #4b7bec;
 }
 
+/* ─── GRÁFICOS E HISTORIAL DIDÁCTICO (Fase 11) ─── */
+.chart-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.bar-label {
+  width: 60px;
+  color: var(--text-muted);
+}
+
+.bar-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 5px;
+}
+
+.bar-ingresos { background: var(--accent-green); }
+.bar-costos { background: var(--accent-red); }
+.bar-sueldos { background: #fa8231; }
+
+.bar-val {
+  width: 68px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.capital-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.hist-details {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.hist-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.hist-list {
+  margin-top: 8px;
+  max-height: 130px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hist-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hist-monto {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 /* ─── RESPONSIVE / MÓVIL ─── */
 @media (max-width: 720px) {
   #hud-container {

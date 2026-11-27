@@ -71,6 +71,15 @@ export interface EventoCliente {
   readonly resultado: TipoEventoCliente;
 }
 
+/** Registro resumido por día (arreglo acotado para gráficos e historial) */
+export interface RegistroDiario {
+  readonly dia: number;
+  readonly capitalFinal: number;
+  readonly ingresos: number;
+  readonly costos: number;   // costoInsumos + costoMejoras
+  readonly sueldos: number;
+}
+
 /** Estado completo del juego (serializable para guardado) */
 export interface EstadoJuego {
   capital: number;
@@ -87,6 +96,7 @@ export interface EstadoJuego {
   costoMejorasHoy: number;                     // acumulado durante PREPARAR
   produccionUsadaHoy: number;                  // pizzas producidas hoy
   semillaPartida: number;                      // semilla PRNG para línea de tiempo
+  historialDiario: RegistroDiario[];           // registro acotado por día
   version: number;                             // para validar al importar
 }
 

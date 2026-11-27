@@ -30,6 +30,7 @@ import {
   NIVELES,
   NIVEL_VICTORIA,
   HISTORIAL_TAMANO,
+  HISTORIAL_DIARIO_MAX,
   SAVE_VERSION,
   type InsumoId,
 } from '../config/game-config';
@@ -37,6 +38,7 @@ import {
 import type {
   EstadoJuego,
   FaseJornada,
+  RegistroDiario,
   ResultadoOperacion,
   ResultadoVentaPizza,
   ResumenJornada,
@@ -108,6 +110,9 @@ export class MotorJuego {
    */
   private _historial: BufferCircular<Transaccion>;
 
+  /** Registro acotado por día para gráficos e historial de capital */
+  private _historialDiario: RegistroDiario[];
+
   constructor() {
     this._capital = CAPITAL_INICIAL;
     this._capitalMaxHistorico = CAPITAL_INICIAL;
@@ -124,6 +129,7 @@ export class MotorJuego {
     this._produccionUsadaHoy = 0;
     this._semillaPartida = generarSemillaPartida();
     this._historial = new BufferCircular<Transaccion>(HISTORIAL_TAMANO);
+    this._historialDiario = [];
 
     // Inicializar inventarios a 0
     for (const id of INSUMO_IDS) {
@@ -249,6 +255,11 @@ export class MotorJuego {
   /** Obtiene el historial de transacciones */
   obtenerHistorial(): Transaccion[] {
     return this._historial.obtenerTodos();
+  }
+
+  /** Obtiene el registro acotado por día */
+  obtenerHistorialDiario(): readonly RegistroDiario[] {
+    return [...this._historialDiario];
   }
 
   /** Obtiene copia de inventarios (para lectura) */
@@ -605,8 +616,19 @@ export class MotorJuego {
     // ─── Generar mensajes educativos ───
     const mensajes = this._generarMensajesEducativos(resultadosVentas);
 
-    // ─── Calcular ganancia del día ───
+    // ─── Calcular ganancia del día y guardar registro diario acotado ───
     const ganancia = ingresosTotal - this._costoInsumosHoy - sueldosTotal - this._costoMejorasHoy;
+
+    this._historialDiario.push({
+      dia: this._dia,
+      capitalFinal: this._capital,
+      ingresos: ingresosTotal,
+      costos: this._costoInsumosHoy + this._costoMejorasHoy,
+      sueldos: sueldosTotal,
+    });
+    if (this._historialDiario.length > HISTORIAL_DIARIO_MAX) {
+      this._historialDiario.shift();
+    }
 
     const resumen: ResumenJornada = {
       dia: this._dia,
@@ -674,13 +696,14 @@ export class MotorJuego {
       costoMejorasHoy: this._costoMejorasHoy,
       produccionUsadaHoy: this._produccionUsadaHoy,
       semillaPartida: this._semillaPartida,
+      historialDiario: [...this._historialDiario],
       version: SAVE_VERSION,
     };
   }
 
   /**
    * Importa un estado previamente exportado.
-   * Valida la versión (migrando desde v1 si aplica) y la estructura antes de cargar.
+   * Valida la versión (migrando desde v1/v2 si aplica) y la estructura antes de cargar.
    */
   importarEstado(estado: EstadoJuego): ResultadoOperacion {
     // Validar objeto
@@ -688,8 +711,8 @@ export class MotorJuego {
       return { exito: false, mensaje: 'El archivo de guardado está vacío o corrupto.' };
     }
 
-    // Validar versión y migrar partidas v1 → v2
-    if (estado.version !== SAVE_VERSION && estado.version !== 1) {
+    // Validar versión y migrar partidas v1/v2 → v3
+    if (estado.version !== SAVE_VERSION && estado.version !== 1 && estado.version !== 2) {
       return { exito: false, mensaje: `Versión incompatible. Esperada: ${SAVE_VERSION}, recibida: ${estado.version}.` };
     }
 
@@ -721,6 +744,9 @@ export class MotorJuego {
     this._costoMejorasHoy = estado.costoMejorasHoy ?? 0;
     this._produccionUsadaHoy = estado.produccionUsadaHoy ?? 0;
     this._semillaPartida = semilla;
+    this._historialDiario = Array.isArray(estado.historialDiario)
+      ? estado.historialDiario.slice(-HISTORIAL_DIARIO_MAX)
+      : [];
 
     // Restaurar Maps desde objetos planos
     this._inventarioInsumos = new Map(Object.entries(estado.inventarioInsumos));
@@ -754,6 +780,7 @@ export class MotorJuego {
     this._empleados.clear();
     this._preciosVenta.clear();
     this._historial.limpiar();
+    this._historialDiario = [];
 
     for (const id of INSUMO_IDS) {
       this._inventarioInsumos.set(id, 0);
@@ -786,65 +813,95 @@ export class MotorJuego {
     }
   }
 
-  /** Genera mensajes educativos basados en los resultados de ventas */
+  /**
+   * Genera máximo 3 mensajes causales concretos ordenados por mayor impacto en Bs.
+   */
   private _generarMensajesEducativos(ventas: ResultadoVentaPizza[]): string[] {
-    const mensajes: string[] = [];
+    interface CandidatoMensaje {
+      texto: string;
+      impactoBs: number;
+    }
+
+    const candidatos: CandidatoMensaje[] = [];
 
     for (const venta of ventas) {
       const receta = RECETAS.find(r => r.id === venta.pizzaId);
       if (!receta) continue;
 
-      // Mensaje por demanda perdida por stock
-      if (venta.perdidaPorStock > 0) {
-        mensajes.push(
-          `Perdiste ${venta.perdidaPorStock} cliente(s) de ${receta.nombre} por falta de stock.`
-        );
-      }
-
-      // Mensaje por demanda perdida por cajeros
-      if (venta.perdidaPorCajeros > 0) {
-        mensajes.push(
-          `Perdiste ${venta.perdidaPorCajeros} cliente(s) de ${receta.nombre} por falta de cajeros.`
-        );
-      }
-
-      // Mensaje por precio alto
       const precio = this.obtenerPrecioVenta(venta.pizzaId);
       const factorPrecio = this.calcularFactorPrecio(precio, receta.precioReferencia);
+
+      // Pérdida por falta de stock (impacto = clientes perdidos * precio)
+      if (venta.perdidaPorStock > 0) {
+        const impactoBs = venta.perdidaPorStock * precio;
+        candidatos.push({
+          texto: `Perdiste ${venta.perdidaPorStock} cliente(s) de ${receta.nombre} por falta de stock (−Bs ${impactoBs} potenciales).`,
+          impactoBs,
+        });
+      }
+
+      // Pérdida por falta de cajeros (impacto = clientes perdidos * precio)
+      if (venta.perdidaPorCajeros > 0) {
+        const impactoBs = venta.perdidaPorCajeros * precio;
+        candidatos.push({
+          texto: `Perdiste ${venta.perdidaPorCajeros} cliente(s) de ${receta.nombre} por falta de cajeros (−Bs ${impactoBs} potenciales).`,
+          impactoBs,
+        });
+      }
+
+      // Precio alto reduciendo la demanda
       if (factorPrecio < 0.8) {
         const reduccion = Math.round((1 - factorPrecio) * 100);
-        mensajes.push(
-          `Tu precio de ${receta.nombre} (Bs ${precio}) redujo la demanda un ${reduccion}%.`
-        );
+        const preferencia = PREFERENCIA_PIZZA[venta.pizzaId] ?? 0;
+        const demandaBase = Math.floor(CLIENTES_BASE_DIA * this.factorDia * preferencia);
+        const perdidosPrecio = Math.max(0, demandaBase - venta.demanda);
+        const impactoBs = perdidosPrecio * receta.precioReferencia;
+        candidatos.push({
+          texto: `Tu precio de ${receta.nombre} (Bs ${precio}) redujo la demanda un ${reduccion}% (−Bs ${impactoBs} potenciales).`,
+          impactoBs,
+        });
       }
 
-      // Mensaje por precio bajo (oportunidad de subir)
+      // Precio bajo atrayendo demanda
       if (factorPrecio > 1.2 && venta.vendidas > 0) {
-        mensajes.push(
-          `El precio bajo de ${receta.nombre} (Bs ${precio}) atrae muchos clientes. ¿Podrías ganar más subiendo el precio?`
-        );
+        const impactoBs = Math.round(venta.vendidas * Math.max(0, receta.precioReferencia - precio));
+        candidatos.push({
+          texto: `El precio bajo de ${receta.nombre} (Bs ${precio}) atrae muchos clientes. ¿Podrías ganar más subiendo el precio?`,
+          impactoBs,
+        });
       }
     }
 
-    // Mensaje de quiebra
+    // Alertas críticas con máxima prioridad
     if (this._capital < 0) {
-      mensajes.push('⚠️ ¡Tu capital es negativo! No pudiste cubrir los costos y la pizzería quebró.');
+      candidatos.push({
+        texto: '⚠️ ¡Tu capital es negativo! No pudiste cubrir los costos y la pizzería quebró.',
+        impactoBs: 1_000_000,
+      });
     } else if (this._capital < 300) {
-      mensajes.push('⚠️ Alerta de liquidez: Tu capital es bajo. Evita contratar personal adicional hasta consolidar ventas.');
+      candidatos.push({
+        texto: '⚠️ Alerta de liquidez: Tu capital es bajo. Evita contratar personal adicional hasta consolidar ventas.',
+        impactoBs: 500_000,
+      });
     }
 
-    // Mensaje de victoria (Nivel 5)
     if (this.victoria) {
-      mensajes.push('🏆 ¡FELICITACIONES! Has alcanzado el Nivel 5 (Bs 25.000) y completado exitosamente la simulación.');
+      candidatos.push({
+        texto: '🏆 ¡FELICITACIONES! Has alcanzado el Nivel 5 (Bs 25.000) y completado exitosamente la simulación.',
+        impactoBs: 1_000_000,
+      });
     }
 
-    // Mensaje si no hubo ventas
     const ventasTotales = ventas.reduce((sum, v) => sum + v.vendidas, 0);
     if (ventasTotales === 0) {
-      mensajes.push('No vendiste ninguna pizza hoy. Asegúrate de adquirir insumos en la Bodega y producirlas en el Horno antes de abrir.');
+      candidatos.push({
+        texto: 'No vendiste ninguna pizza hoy. Asegúrate de adquirir insumos en la Bodega y producirlas en el Horno antes de abrir.',
+        impactoBs: 400_000,
+      });
     }
 
-    return mensajes;
+    candidatos.sort((a, b) => b.impactoBs - a.impactoBs);
+    return candidatos.slice(0, 3).map(c => c.texto);
   }
 }
 
