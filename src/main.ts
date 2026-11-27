@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { MotorJuego } from './core/motor-juego';
+import { generarLineaTiempo } from './core/generador-linea-tiempo';
+import { ControladorReproduccion } from './core/controlador-reproduccion';
 import { GestorHUD } from './ui/gestor-hud';
 import { GestorPaneles, type TipoEstacion } from './ui/gestor-paneles';
 import { EscenaPrincipal } from './scenes/escena-principal';
 import { Toast } from './ui/toast';
 import { SAVE_KEY } from './config/game-config';
 import { ANCHO_JUEGO, ALTO_JUEGO } from './config/escena-config';
-import type { EstadoJuego } from './core/tipos';
+import type { EstadoJuego, ResumenJornada } from './core/tipos';
 import './style.css';
 
 class AplicacionJuego {
@@ -14,6 +16,9 @@ class AplicacionJuego {
   private hud!: GestorHUD;
   private paneles!: GestorPaneles;
   private juegoPhaser!: Phaser.Game;
+  private escena!: EscenaPrincipal;
+  private controladorReproduccion: ControladorReproduccion | null = null;
+  private ultimoResumen: ResumenJornada | null = null;
 
   constructor() {
     this.motor = new MotorJuego();
@@ -69,9 +74,13 @@ class AplicacionJuego {
 
     // Conectar eventos cuando la escena esté lista
     this.juegoPhaser.events.once('ready', () => {
-      const escena = this.juegoPhaser.scene.getScene('EscenaPrincipal') as EscenaPrincipal;
-      escena.scene.restart({
+      this.escena = this.juegoPhaser.scene.getScene('EscenaPrincipal') as EscenaPrincipal;
+      this.escena.scene.restart({
         alSeleccionarEstacion: (estacion: TipoEstacion) => {
+          if (this.controladorReproduccion) {
+            Toast.mostrar('La pizzería está abierta. Espera el cierre o pulsa Saltar.');
+            return;
+          }
           if (this.motor.fase === 'preparar') {
             this.paneles.abrir(estacion);
           } else if (this.motor.fase === 'cerrar') {
@@ -83,21 +92,81 @@ class AplicacionJuego {
   }
 
   private manejarBotonPrincipal(): void {
+    if (this.controladorReproduccion) return;
+
     if (this.motor.fase === 'preparar') {
+      this.paneles.cerrar();
+
+      // Guardar el número de cajeros antes de abrir (no cambia al cerrar, pero es claro)
+      const numCajeros = this.motor.obtenerEmpleados('cajero');
+      const precios = this.motor.obtenerPreciosVenta();
       const resumen = this.motor.abrirPizzeria();
-      if (resumen) {
-        this.guardarPartidaAuto();
-        this.actualizarTodo();
-        this.paneles.abrir('resumen', resumen);
-      }
+      if (!resumen) return;
+
+      this.ultimoResumen = resumen;
+
+      // Generar línea de tiempo determinista a partir del resultado del núcleo
+      const eventos = generarLineaTiempo(resumen, this.motor.semillaPartida, resumen.dia);
+      const ctrl = new ControladorReproduccion({
+        eventos,
+        resumen,
+        preciosVenta: precios,
+      });
+      this.controladorReproduccion = ctrl;
+
+      this.hud.setEnReproduccion(true);
+      this.actualizarBarraReproduccion();
+
+      this.escena.iniciarReproduccion(
+        ctrl,
+        numCajeros,
+        () => this.actualizarBarraReproduccion(),
+        () => this.finalizarReproduccion()
+      );
     } else if (this.motor.fase === 'cerrar') {
-      // Reabrir resumen de la jornada
-      Toast.mostrar('Avanza al siguiente día para continuar operando.');
+      if (this.ultimoResumen) {
+        this.paneles.abrir('resumen', this.ultimoResumen);
+      } else {
+        this.avanzarDia();
+      }
+    }
+  }
+
+  private actualizarBarraReproduccion(): void {
+    if (!this.controladorReproduccion) return;
+    const ctrl = this.controladorReproduccion;
+    this.hud.renderReproduccion(ctrl, {
+      alAlternarPausa: () => {
+        ctrl.alternarPausa();
+        this.actualizarBarraReproduccion();
+      },
+      alCambiarVelocidad: (v) => {
+        ctrl.fijarVelocidad(v);
+        this.actualizarBarraReproduccion();
+      },
+      alSaltarDia: () => {
+        ctrl.saltar();
+        this.escena.limpiarReproduccion();
+        this.finalizarReproduccion();
+      },
+    });
+  }
+
+  private finalizarReproduccion(): void {
+    const resumen = this.ultimoResumen ?? this.controladorReproduccion?.resumen ?? null;
+    this.controladorReproduccion = null;
+    this.hud.setEnReproduccion(false);
+    this.guardarPartidaAuto();
+    this.actualizarTodo();
+    if (resumen) {
+      this.paneles.abrir('resumen', resumen);
     }
   }
 
   private avanzarDia(): void {
+    this.ultimoResumen = null;
     this.motor.avanzarDia();
+    this.guardarPartidaAuto();
     this.actualizarTodo();
     Toast.mostrar(`Comenzando ${this.motor.nombreDia}. ¡Buena suerte con las ventas!`);
   }

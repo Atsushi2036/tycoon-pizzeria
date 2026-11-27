@@ -352,6 +352,94 @@ body {
   transform: translate(-50%, -10px);
 }
 
+/* ─── BARRA DE REPRODUCCIÓN DEL DÍA (Fase 9) ─── */
+#playback-bar {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(94%, 760px);
+  background: rgba(15, 18, 32, 0.94);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 15;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+}
+
+#playback-bar.hidden {
+  display: none;
+}
+
+.pb-reloj {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 170px;
+}
+
+.pb-progress-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pb-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-green));
+  transition: width 0.08s linear;
+}
+
+.pb-stats {
+  display: flex;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.pb-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-vel {
+  background: #3b4261;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-vel.active {
+  background: var(--accent-gold);
+  color: #121420;
+}
+
+.btn-skip {
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-skip:hover {
+  background: #4b7bec;
+}
+
 /* ─── RESPONSIVE / MÓVIL ─── */
 @media (max-width: 720px) {
   #hud-container {

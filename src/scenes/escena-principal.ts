@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import type { TipoEstacion } from '../ui/gestor-paneles';
+import type { EventoCliente } from '../core/tipos';
+import { ColaFIFO } from '../core/cola-fifo';
+import { ControladorReproduccion } from '../core/controlador-reproduccion';
 import {
   ANCHO_JUEGO,
   ALTO_JUEGO,
@@ -9,6 +12,8 @@ import {
   ZONA_MESAS,
   POSICIONES_INTERIOR,
   COLORES_ESCENA,
+  COLORES_PIZZA_CLIENTE,
+  RUTAS_CLIENTES,
   type ConfigEstacion,
 } from '../config/escena-config';
 
@@ -16,8 +21,29 @@ export interface DatosEscenaPrincipal {
   alSeleccionarEstacion: (estacion: TipoEstacion) => void;
 }
 
+interface ClienteVisual {
+  contenedor: Phaser.GameObjects.Container;
+  evento: EventoCliente;
+  estado: 'entrando' | 'en_fila' | 'atendiendo' | 'saliendo';
+  objetivoX: number;
+  objetivoY: number;
+  waypointIdx: number;
+  waypoints: Array<{ x: number; y: number }>;
+  puestoIdx: number;
+  tiempoRestanteAtencion: number;
+}
+
 export class EscenaPrincipal extends Phaser.Scene {
   private alSeleccionarEstacion!: (estacion: TipoEstacion) => void;
+
+  // Estado de reproducción del día (Fase 9)
+  private controlador: ControladorReproduccion | null = null;
+  private alTickReproduccion: (() => void) | null = null;
+  private alTerminarReproduccion: (() => void) | null = null;
+  private colaMostrador = new ColaFIFO<ClienteVisual>();
+  private clientesActivos: ClienteVisual[] = [];
+  private puestosOcupados: Array<ClienteVisual | null> = [];
+  private capaClientes!: Phaser.GameObjects.Layer;
 
   constructor() {
     super({ key: 'EscenaPrincipal' });
@@ -45,6 +71,210 @@ export class EscenaPrincipal extends Phaser.Scene {
     for (const cfg of Object.values(ESTACIONES_CONFIG)) {
       this.crearZonaInteractivaEstacion(cfg);
     }
+
+    // 5. Capa para clientes animados durante la reproducción
+    this.capaClientes = this.add.layer();
+  }
+
+  /** Inicia la reproducción visual de la jornada en la escena */
+  iniciarReproduccion(
+    controlador: ControladorReproduccion,
+    numCajeros: number,
+    alTick: () => void,
+    alTerminar: () => void
+  ): void {
+    this.limpiarReproduccion();
+    this.controlador = controlador;
+    this.alTickReproduccion = alTick;
+    this.alTerminarReproduccion = alTerminar;
+
+    const totalPuestos = Math.min(
+      RUTAS_CLIENTES.puestosMostrador.length,
+      1 + Math.max(0, numCajeros)
+    );
+    this.puestosOcupados = new Array(totalPuestos).fill(null);
+  }
+
+  /** Detiene y limpia todos los clientes visuales (ej. al pulsar Saltar día) */
+  limpiarReproduccion(): void {
+    for (const cliente of this.clientesActivos) {
+      cliente.contenedor.destroy();
+    }
+    this.clientesActivos = [];
+    this.colaMostrador.limpiar();
+    this.puestosOcupados = [];
+    this.controlador = null;
+    this.alTickReproduccion = null;
+    this.alTerminarReproduccion = null;
+  }
+
+  override update(_time: number, delta: number): void {
+    if (!this.controlador) return;
+
+    const deltaSeg = delta / 1000;
+    const nuevosEventos = this.controlador.avanzar(deltaSeg);
+
+    for (const ev of nuevosEventos) {
+      this.spawnearCliente(ev);
+    }
+
+    if (!this.controlador.pausado) {
+      this.actualizarClientes(deltaSeg * this.controlador.velocidad);
+    }
+
+    this.alTickReproduccion?.();
+
+    if (this.controlador.terminado) {
+      const callbackFin = this.alTerminarReproduccion;
+      this.limpiarReproduccion();
+      callbackFin?.();
+    }
+  }
+
+  private spawnearCliente(evento: EventoCliente): void {
+    const colorPizza = COLORES_PIZZA_CLIENTE[evento.pizzaId] ?? 0xffffff;
+    const contenedor = this.add.container(
+      RUTAS_CLIENTES.entradaExterior.x,
+      RUTAS_CLIENTES.entradaExterior.y
+    );
+
+    const cuerpo = this.add.circle(0, 0, 10, colorPizza, 1);
+    cuerpo.setStrokeStyle(2, 0xffffff, 0.9);
+    contenedor.add(cuerpo);
+    this.capaClientes.add(contenedor);
+
+    const cliente: ClienteVisual = {
+      contenedor,
+      evento,
+      estado: 'entrando',
+      objetivoX: RUTAS_CLIENTES.entradaInterior.x,
+      objetivoY: RUTAS_CLIENTES.entradaInterior.y,
+      waypointIdx: 0,
+      waypoints: [
+        RUTAS_CLIENTES.entradaInterior,
+        RUTAS_CLIENTES.pasilloEspera,
+      ],
+      puestoIdx: -1,
+      tiempoRestanteAtencion: 0,
+    };
+
+    this.clientesActivos.push(cliente);
+  }
+
+  private actualizarClientes(deltaEscalado: number): void {
+    const velocidadPx = 150; // px/seg a x1
+    const paso = velocidadPx * deltaEscalado;
+
+    // 1. Mover clientes
+    for (const cliente of this.clientesActivos) {
+      if (cliente.estado === 'atendiendo') {
+        cliente.tiempoRestanteAtencion -= deltaEscalado;
+        if (cliente.tiempoRestanteAtencion <= 0) {
+          this.finalizarAtencionCliente(cliente);
+        }
+        continue;
+      }
+
+      const dx = cliente.objetivoX - cliente.contenedor.x;
+      const dy = cliente.objetivoY - cliente.contenedor.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= paso || dist < 1) {
+        cliente.contenedor.setPosition(cliente.objetivoX, cliente.objetivoY);
+        this.alLlegarADestino(cliente);
+      } else {
+        cliente.contenedor.x += (dx / dist) * paso;
+        cliente.contenedor.y += (dy / dist) * paso;
+      }
+    }
+
+    // 2. Asignar frente de la ColaFIFO a puestos libres del mostrador
+    for (let i = 0; i < this.puestosOcupados.length; i++) {
+      if (this.puestosOcupados[i] === null && !this.colaMostrador.estaVacia()) {
+        const siguiente = this.colaMostrador.desencolar()!;
+        this.puestosOcupados[i] = siguiente;
+        siguiente.estado = 'atendiendo';
+        siguiente.puestoIdx = i;
+        const puesto = RUTAS_CLIENTES.puestosMostrador[i];
+        siguiente.contenedor.setPosition(puesto.x, puesto.y);
+        siguiente.tiempoRestanteAtencion = 0.45;
+      }
+    }
+
+    // 3. Reacomodar posiciones visuales de quienes esperan en la ColaFIFO
+    const enFila = this.colaMostrador.obtenerTodos();
+    enFila.forEach((c, idx) => {
+      const posVisible = Math.min(idx, RUTAS_CLIENTES.filaMaxVisible - 1);
+      c.objetivoX = RUTAS_CLIENTES.filaInicio.x;
+      c.objetivoY = RUTAS_CLIENTES.filaInicio.y + posVisible * RUTAS_CLIENTES.filaEspaciadoY;
+    });
+
+    // 4. Eliminar clientes que ya salieron del local
+    this.clientesActivos = this.clientesActivos.filter((c) => {
+      if (c.estado === 'saliendo' && c.waypointIdx >= c.waypoints.length) {
+        c.contenedor.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private alLlegarADestino(cliente: ClienteVisual): void {
+    if (cliente.estado === 'entrando') {
+      cliente.waypointIdx++;
+      if (cliente.waypointIdx < cliente.waypoints.length) {
+        const sig = cliente.waypoints[cliente.waypointIdx];
+        cliente.objetivoX = sig.x;
+        cliente.objetivoY = sig.y;
+      } else {
+        // Llegó al mostrador: entra a la ColaFIFO real
+        cliente.estado = 'en_fila';
+        this.colaMostrador.encolar(cliente);
+      }
+    } else if (cliente.estado === 'saliendo') {
+      cliente.waypointIdx++;
+      if (cliente.waypointIdx < cliente.waypoints.length) {
+        const sig = cliente.waypoints[cliente.waypointIdx];
+        cliente.objetivoX = sig.x;
+        cliente.objetivoY = sig.y;
+      }
+    }
+  }
+
+  private finalizarAtencionCliente(cliente: ClienteVisual): void {
+    if (cliente.puestoIdx >= 0 && cliente.puestoIdx < this.puestosOcupados.length) {
+      this.puestosOcupados[cliente.puestoIdx] = null;
+    }
+
+    // Indicador visual del resultado (atendido o causa de pérdida)
+    let textoEtiqueta = '🍕';
+    let colorTexto = '#2ecc71';
+    if (cliente.evento.resultado === 'sin_stock') {
+      textoEtiqueta = '❌ Sin stock';
+      colorTexto = '#ff6b6b';
+    } else if (cliente.evento.resultado === 'sin_cajeros') {
+      textoEtiqueta = '⏳ Sin cajeros';
+      colorTexto = '#feca57';
+    }
+
+    const aviso = this.add.text(0, -18, textoEtiqueta, {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: colorTexto,
+      backgroundColor: 'rgba(15,18,32,0.75)',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5);
+    cliente.contenedor.add(aviso);
+
+    cliente.estado = 'saliendo';
+    cliente.waypointIdx = 0;
+    cliente.waypoints = [
+      RUTAS_CLIENTES.salidaInterior,
+      RUTAS_CLIENTES.salidaExterior,
+    ];
+    cliente.objetivoX = cliente.waypoints[0].x;
+    cliente.objetivoY = cliente.waypoints[0].y;
   }
 
   /** Dibuja el fondo exterior y los pisos diferenciados de cada zona */

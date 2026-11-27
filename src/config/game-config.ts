@@ -212,6 +212,12 @@ export const HORA_FIN_DIA = 20;
 /** Duración del día en horas */
 export const DURACION_DIA_HORAS = HORA_FIN_DIA - HORA_INICIO_DIA; // 12
 
+/** Duración en segundos reales de la reproducción del día a velocidad ×1 */
+export const DURACION_REPRODUCCION_SEGUNDOS = 60;
+
+/** Velocidades permitidas de reproducción */
+export const VELOCIDADES_REPRODUCCION = [1, 2, 4] as const;
+
 /**
  * Pesos por hora para la distribución de llegada de clientes.
  * Índice 0 = 08:00–09:00, índice 11 = 19:00–20:00.

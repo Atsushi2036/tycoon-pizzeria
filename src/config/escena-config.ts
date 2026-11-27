@@ -140,3 +140,32 @@ export const COLORES_ESCENA = {
   silla: 0x57606f,
   escritorio: 0x6c4f3d,
 } as const;
+
+/** Colores de los clientes según la pizza que piden */
+export const COLORES_PIZZA_CLIENTE: Readonly<Record<string, number>> = {
+  margarita: 0xf1c40f, // amarillo queso
+  pepperoni: 0xe74c3c, // rojo pepperoni
+  hawaiana: 0x2ecc71,  // verde piña/jamón
+};
+
+/** Puntos de paso fijos para la reproducción de clientes (SIN pathfinding) */
+export const RUTAS_CLIENTES = {
+  entradaExterior: { x: 260, y: 634 },
+  entradaInterior: { x: 260, y: 582 },
+  pasilloEspera: { x: 260, y: 515 },
+  /** Puestos de atención frente al mostrador (dueño + hasta 5 cajeros) */
+  puestosMostrador: [
+    { x: 145, y: 400 },
+    { x: 195, y: 400 },
+    { x: 245, y: 400 },
+    { x: 295, y: 400 },
+    { x: 345, y: 400 },
+    { x: 395, y: 400 },
+  ],
+  /** Inicio y espaciado vertical de la fila FIFO frente al mostrador */
+  filaInicio: { x: 260, y: 448 },
+  filaEspaciadoY: 22,
+  filaMaxVisible: 6,
+  salidaInterior: { x: 225, y: 582 },
+  salidaExterior: { x: 225, y: 642 },
+} as const;
